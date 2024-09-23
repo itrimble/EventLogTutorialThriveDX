@@ -1,5 +1,8 @@
+Here’s the updated **README.md** with the **NPX** section added back, including all the previous details:
 
-# Event Logging App
+---
+
+# Event Logging Best Practices App
 
 This project helps cybersecurity students and analysts learn about Windows Event Logging, security monitoring, and query generation for SIEM platforms like Splunk, Sentinel, ELK, and Logstash. This guide provides instructions on how to set up the project on your local machine and how to integrate Cursor AI for faster query generation.
 
@@ -72,8 +75,33 @@ To run this project, you’ll need the following tools:
    ```bash
    npx create-next-app@latest event-logging-app
    ```
+   This will prompt you to configure the project:
+   - **TypeScript**: Yes/No (Select Yes if you prefer TypeScript).
+   - **ESLint**: Yes (Helps maintain code quality).
+   - **Tailwind CSS**: Yes (For styling).
+   - **src directory**: Yes/No (Optional directory structure, choose as per your preference).
+   - **import alias**: No (Optional for large-scale projects).
 
-### Step 3: Clone the Repository
+3. Once the project is created, navigate into the new folder:
+   ```bash
+   cd event-logging-app
+   ```
+
+4. Install the dependencies for the new project:
+   ```bash
+   npm install
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. Open your browser and go to `http://localhost:3000` to see your example **event-logging-app** running.
+
+---
+
+## Step 3: Clone the Repository
 
 After installing Git, you can clone the app repository to your local machine.
 
@@ -190,7 +218,8 @@ If you'd like to deploy this app to the web, you can use **Vercel**. Here’s ho
 
 ---
 
-## Dependencies Summary
+## Dependencies
+## Dependencies Summary (continued)
 
 - **Node.js**: Required to run JavaScript code and install npm packages.
    - [Learn More About Node.js](https://nodejs.org/)
@@ -202,14 +231,6 @@ If you'd like to deploy this app to the web, you can use **Vercel**. Here’s ho
    - [Learn More About Git](https://git-scm.com/)
 - **Supabase**: Backend for handling real-time data and storage.
    - [Learn More About Supabase](https://supabase.com/)
-- **React**: JavaScript library for building the user interface.
-   - [Learn More About React](https://reactjs.org/)
-- **Here’s the continuation of the **Dependencies Summary** section from the previous README:
-
----
-
-## Dependencies Summary (continued)
-
 - **React**: JavaScript library for building the user interface.
    - [Learn More About React](https://reactjs.org/)
 - **Tailwind CSS**: CSS framework for styling the application.
@@ -255,3 +276,4 @@ If you run into issues or have any questions, feel free to reach out by opening 
 Happy coding!
 
 ---
+
