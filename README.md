@@ -1,6 +1,7 @@
-# Event Logging Best Practices App
 
-This project helps cybersecurity students and analysts learn about Windows Event Logging, security monitoring, and query generation for SIEM platforms like Splunk, Sentinel, ELK, and Logstash. This guide provides instructions on how to set up the project on your local machine.
+# Event Logging App
+
+This project helps cybersecurity students and analysts learn about Windows Event Logging, security monitoring, and query generation for SIEM platforms like Splunk, Sentinel, ELK, and Logstash. This guide provides instructions on how to set up the project on your local machine and how to integrate Cursor AI for faster query generation.
 
 ## Key Features
 
@@ -16,11 +17,20 @@ This project helps cybersecurity students and analysts learn about Windows Event
 To run this project, you’ll need the following tools:
 
 1. **Node.js**: The platform to run JavaScript code.
-   - Comes with **npm** and **npx**, package managers to install and run JavaScript packages.
-2. **Git**: Version control software to clone and manage the code repository.
-3. **Vercel (Optional)**: Cloud platform for deploying the project (if you want to deploy it online).
-4. **Supabase**: You will need to create a project in Supabase to handle data storage and real-time updates (details below).
-5. **Text Editor/IDE**: Use **Visual Studio Code** or **Sublime Text** for writing and editing code.
+   - [Learn More About Node.js](https://nodejs.org/)
+2. **npm** and **npx**: Node.js package managers that are bundled with Node.js.
+   - [Learn More About npm](https://www.npmjs.com/)
+3. **Git**: Version control software to clone and manage the code repository.
+   - [Learn More About Git](https://git-scm.com/)
+4. **Vercel (Optional)**: Cloud platform for deploying the project (if you want to deploy it online).
+   - [Learn More About Vercel](https://vercel.com/)
+5. **Supabase**: For managing data storage and real-time updates.
+   - [Learn More About Supabase](https://supabase.com/)
+6. **Cursor AI (Optional)**: A tool to help automate code generation and speed up query response.
+   - [Download Cursor AI](https://www.cursor.so/)
+7. **Text Editor/IDE**: Use **Visual Studio Code** or **Sublime Text** for writing and editing code.
+   - [Visual Studio Code](https://code.visualstudio.com/)
+   - [Sublime Text](https://www.sublimetext.com/)
 
 ---
 
@@ -37,7 +47,6 @@ To run this project, you’ll need the following tools:
    npm -v
    npx -v
    ```
-   You should see the version numbers of Node.js, npm, and npx.
 
 #### Windows:
 1. Go to the [Node.js website](https://nodejs.org/) and download the **LTS** version.
@@ -49,21 +58,19 @@ To run this project, you’ll need the following tools:
    npx -v
    ```
 
-### Step 2: Install Git
+---
 
-#### Mac:
-1. Open the **Terminal** and run the following command:
-   ```bash
-   git --version
-   ```
-   If Git is not installed, the terminal will prompt you to install it. Follow the prompts.
+## Step 2: Setting Up **npx** and Running an Example Project
 
-#### Windows:
-1. Download Git from the [official website](https://git-scm.com/).
-2. Run the installer, accepting the default settings.
-3. Verify Git is installed by running the following command in **Command Prompt**:
+**npx** allows you to run npm packages without installing them globally. We’ll use **npx** to set up an example project called **event-logging-app**.
+
+### Create an Example Project
+
+#### Mac and Windows:
+1. Open **Terminal** (Mac) or **Command Prompt** (Windows).
+2. Run the following command to create a new project using **npx**:
    ```bash
-   git --version
+   npx create-next-app@latest event-logging-app
    ```
 
 ### Step 3: Clone the Repository
@@ -78,33 +85,71 @@ After installing Git, you can clone the app repository to your local machine.
    cd event-logging-app
    ```
 
-### Step 4: Install Project Dependencies
+---
 
-The project uses several npm packages to work. To install them:
+## Step 4: Document Sources
 
-#### Mac and Windows:
-1. Navigate to the project folder (`event-logging-app`).
-2. Run the following command to install the necessary dependencies:
-   ```bash
-   npm install
-   ```
+The following sources are used to enhance the accuracy and efficiency of the **Event Logging Best Practices App**:
 
-This will install packages like **React**, **Tailwind CSS**, and **Supabase**.
+1. **Windows Event Log Documentation**:
+   - Official documentation on Windows Event IDs.
+   - [Microsoft Event Log Documentation](https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/basic-security-audit-events)
 
-### Step 5: Set Up Supabase
+2. **MITRE ATT&CK Framework**:
+   - Detailed tactics, techniques, and procedures (TTPs) mapped to event logs.
+   - [MITRE ATT&CK Framework](https://attack.mitre.org/)
 
-You'll need Supabase to handle data storage and real-time updates. Follow these steps:
+3. **SIEM Platform Documentation**:
+   - Documentation for generating SIEM-specific queries for Splunk, Sentinel, ELK, and Logstash.
+   - [Splunk Search Documentation](https://docs.splunk.com/Documentation/Splunk/latest/SearchTutorial/WelcometotheSearchTutorial)
+   - [Microsoft Sentinel KQL Documentation](https://learn.microsoft.com/en-us/azure/sentinel/queries)
+   - [ELK Documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html)
+   - [Logstash Documentation](https://www.elastic.co/guide/en/logstash/current/index.html)
 
-1. Sign up at [Supabase](https://supabase.com/).
-2. Create a new project in Supabase.
-3. In the project settings, get the **API URL** and **Anon Key**.
-4. Create a file named `.env.local` in the root of your project and add the following:
-   ```bash
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
+4. **NIST Cybersecurity Framework**:
+   - Best practices for managing cybersecurity-related risks.
+   - [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)
 
-### Step 6: Run the Development Server
+5. **Carnegie Mellon Insider Threat Resources**:
+   - Guides and best practices for insider threat management.
+   - [CERT Insider Threat Center](https://resources.sei.cmu.edu/library/asset-view.cfm?assetid=540644)
+
+6. **National Vulnerability Database (NVD)**:
+   - Repository of vulnerabilities and exposures.
+   - [National Vulnerability Database (NVD)](https://nvd.nist.gov/)
+
+7. **Sysmon Documentation**:
+   - System Monitor logs critical security events.
+   - [Sysmon Documentation](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
+
+8. **Cursor AI**:
+   - Enhances code automation and analysis, improving response time.
+   - [Cursor AI Documentation](https://docs.cursor.so/)
+
+---
+
+## Step 5: Setting Up Cursor AI
+
+Cursor AI can help automate and speed up query generation, making it easier to analyze logs and create search queries for different SIEM platforms.
+
+### Getting Started with Cursor AI
+
+1. **Download and Install Cursor AI**:
+   - Visit the [Cursor AI download page](https://www.cursor.so/) and download the appropriate version for your OS.
+   
+2. **Set Up Cursor AI**:
+   - After installation, follow the on-screen prompts to set up your workspace.
+   - You can import your project’s data sources (such as the Windows Event Log documentation and MITRE ATT&CK Framework) into Cursor for quicker analysis.
+
+3. **Configure Cursor for the App**:
+   - Ensure you load the **Windows Event Log Documentation** and **MITRE ATT&CK Framework** into Cursor’s knowledge base so that it can respond accurately to queries.
+
+4. **Use Cursor to Automate Query Generation**:
+   - With Cursor integrated, you can input commands like “search for privilege escalation Event IDs,” and Cursor will return relevant Event IDs along with SIEM search queries.
+
+---
+
+## Step 6: Run the Development Server
 
 Once everything is set up, you can start the development server to run the project locally.
 
@@ -148,15 +193,37 @@ If you'd like to deploy this app to the web, you can use **Vercel**. Here’s ho
 ## Dependencies Summary
 
 - **Node.js**: Required to run JavaScript code and install npm packages.
+   - [Learn More About Node.js](https://nodejs.org/)
 - **npm**: Package manager for installing project dependencies.
+   - [Learn More About npm](https://www.npmjs.com/)
 - **npx**: Runs npm packages without installing them globally.
+   - [Learn More About npx](https://www.npmjs.com/package/npx)
 - **Git**: Version control to clone and manage the code.
+   - [Learn More About Git](https://git-scm.com/)
 - **Supabase**: Backend for handling real-time data and storage.
+   - [Learn More About Supabase](https://supabase.com/)
 - **React**: JavaScript library for building the user interface.
+   - [Learn More About React](https://reactjs.org/)
+- **Here’s the continuation of the **Dependencies Summary** section from the previous README:
+
+---
+
+## Dependencies Summary (continued)
+
+- **React**: JavaScript library for building the user interface.
+   - [Learn More About React](https://reactjs.org/)
 - **Tailwind CSS**: CSS framework for styling the application.
+   - [Learn More About Tailwind CSS](https://tailwindcss.com/)
 - **Axios**: HTTP client for making API requests.
-- **ESLint**: Tool to maintain code quality.
+   - [Learn More About Axios](https://axios-http.com/)
+- **ESLint**: Tool to maintain code quality and catch errors.
+   - [Learn More About ESLint](https://eslint.org/)
 - **Prettier**: Code formatter to ensure consistency.
+   - [Learn More About Prettier](https://prettier.io/)
+- **Vercel**: Platform for deploying web applications.
+   - [Learn More About Vercel](https://vercel.com/)
+- **Cursor AI**: AI-driven tool for speeding up query generation and automating tasks.
+   - [Learn More About Cursor AI](https://www.cursor.so/)
 
 ---
 
@@ -181,10 +248,10 @@ If you'd like to deploy this app to the web, you can use **Vercel**. Here’s ho
 
 ## Need Help?
 
-If you run into issues or have any questions, feel free to reach out by opening an issue in the repository or contacting `Ian Trimble itrimble@gmail.com`.
+If you run into issues or have any questions, feel free to reach out by opening an issue in the repository or contacting:
+
+**Ian Trimble**: [itrimble@gmail.com](mailto:itrimble@gmail.com)
 
 Happy coding!
 
 ---
-
-Let me know if you need any further adjustments or more details on any step!
