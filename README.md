@@ -201,6 +201,66 @@ If you'd like to deploy this app to the web, you can use **Vercel**. Here’s ho
 3. Import your **event-logging-app** repository.
 4. Vercel will automatically deploy the app and give you a live URL.
 
+Here’s the CLI-based section you can add to the **README.md** for deploying the **Event Logging Best Practices App** to **Vercel**:
+
+---
+
+## Deploying to Vercel (CLI Instructions)
+
+Follow these steps to deploy the app to **Vercel** using the command-line interface (CLI):
+
+### Prerequisites:
+- Make sure you have [Vercel CLI](https://vercel.com/download) installed globally:
+   ```bash
+   npm install -g vercel
+   ```
+- Ensure you have a [Vercel account](https://vercel.com/signup) and are logged in:
+   ```bash
+   vercel login
+   ```
+
+### Steps to Deploy CLI:
+
+1. **Navigate to Your Project Directory**:
+   ```bash
+   cd /path-to-your-project-directory
+   ```
+
+2. **Deploy the App with Vercel CLI**:
+   Run the following command to start the deployment process:
+   ```bash
+   vercel
+   ```
+
+3. **Configure the Deployment**:
+   You will be prompted with a few questions:
+   - **Link to existing project?** (If it's your first time, choose "No").
+   - **Project name**: Press Enter to accept the default (or customize it).
+   - **Directory to deploy**: Press Enter to deploy the current directory.
+   - **Configure as new project?**: Yes.
+   - **Overwrite settings?**: No (if you're deploying for the first time).
+   
+4. **Environment Variables** (Optional):
+   If your project requires environment variables (e.g., Supabase credentials), add them:
+   ```bash
+   vercel env add NEXT_PUBLIC_SUPABASE_URL
+   vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+   ```
+   You can manage all environment variables from your Vercel project dashboard.
+
+5. **View the Live Deployment**:
+   Once the deployment is complete, Vercel will provide a live URL where you can access the app.
+
+6. **Production Deployment**:
+   For a production deployment, run:
+   ```bash
+   vercel --prod
+   ```
+
+---
+
+This section provides simple CLI instructions for deploying the app to Vercel. Let me know if any adjustments are needed!
+
 ---
 
 ## Troubleshooting
