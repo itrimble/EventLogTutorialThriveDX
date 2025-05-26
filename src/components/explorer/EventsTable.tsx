@@ -1,63 +1,116 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import logEntryData from '@/lib/data/mock_log_entries.json'; 
+import React, { useState, useMemo, useEffect } from 'react';
+import type { LogEntry } from '@/lib/types/log_entry'; 
 import EventDetailsModal from './EventDetailsModal'; 
 
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  event_id: string;
-  hostname: string;
-  user: string;
-  source_ip: string;
-  log_level: string;
-  description: string;
-  full_data: object | string;
-  mitre_attack_mapping?: string;
-}
+const ITEMS_PER_PAGE = 15;
 
-const ITEMS_PER_PAGE = 10; // Adjusted for potentially longer log entry rows
-
-type SortKey = keyof Pick<LogEntry, 'timestamp' | 'event_id' | 'hostname' | 'user' | 'log_level'>;
+// Define a specific sort key type for LogEntry fields that are sortable
+type LogEntrySortKey = 'timestamp' | 'source_identifier' | 'log_file';
 type SortOrder = 'asc' | 'desc';
 
-const EventsTable: React.FC = () => {
+interface EventsTableProps {
+  logEntries: LogEntry[];
+  isLoading: boolean;
+  error: string | null;
+  // onOpenModal: (logEntry: LogEntry) => void; // Optional: if modal control is lifted
+}
+
+const EventsTable: React.FC<EventsTableProps> = ({ 
+  logEntries, 
+  isLoading, 
+  error 
+  // onOpenModal 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEvent, setSelectedEvent] = useState<LogEntry | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>('timestamp');
+  
+  // Default sort by timestamp descending
+  const [sortKey, setSortKey] = useState<LogEntrySortKey>('timestamp');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
-  const rawData: LogEntry[] = useMemo(() => logEntryData as LogEntry[], []);
+import React, { useState, useMemo, useEffect } from 'react';
+import type { LogEntry } from '@/lib/types/log_entry';
+import EventDetailsModal from './EventDetailsModal';
+import useDebounce from '@/hooks/useDebounce'; // Import the hook
+import { XCircle, Search as SearchIcon, FileText, FileJson } from 'lucide-react'; // Added icons
+import { generateFilename, exportToCsv, exportToJson } from '@/lib/utils/exportUtils'; // Import from new location
+
+const ITEMS_PER_PAGE = 15;
+
+// Define a specific sort key type for LogEntry fields that are sortable
+type LogEntrySortKey = 'timestamp' | 'source_identifier' | 'log_file';
+type SortOrder = 'asc' | 'desc';
+
+interface EventsTableProps {
+  logEntries: LogEntry[];
+  isLoading: boolean;
+  error: string | null;
+  // onOpenModal: (logEntry: LogEntry) => void; // Optional: if modal control is lifted
+}
+
+const EventsTable: React.FC<EventsTableProps> = ({ 
+  logEntries, 
+  isLoading, 
+  error 
+  // onOpenModal 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search term by 300ms
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedEvent, setSelectedEvent] = useState<LogEntry | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Default sort by timestamp descending
+  const [sortKey, setSortKey] = useState<LogEntrySortKey>('timestamp');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // Reset current page when logEntries or debouncedSearchTerm change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [logEntries, debouncedSearchTerm]);
 
   const sortedData = useMemo(() => {
-    return [...rawData].sort((a, b) => {
-      if (a[sortKey] < b[sortKey]) {
+    // Sort the initial logEntries
+    return [...logEntries].sort((a, b) => {
+      const valA = a[sortKey];
+      const valB = b[sortKey];
+
+      if (valA < valB) {
         return sortOrder === 'asc' ? -1 : 1;
       }
-      if (a[sortKey] > b[sortKey]) {
+      if (valA > valB) {
         return sortOrder === 'asc' ? 1 : -1;
       }
       return 0;
     });
-  }, [rawData, sortKey, sortOrder]);
+  }, [logEntries, sortKey, sortOrder]);
 
   const filteredData = useMemo(() => {
-    if (!searchTerm) {
-      return sortedData;
+    if (!debouncedSearchTerm.trim()) {
+      return sortedData; // Use sortedData as the base for filtering
     }
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return sortedData.filter(log => 
-      log.event_id.toLowerCase().includes(lowerSearchTerm) ||
-      log.description.toLowerCase().includes(lowerSearchTerm) ||
-      log.user.toLowerCase().includes(lowerSearchTerm) ||
-      log.hostname.toLowerCase().includes(lowerSearchTerm) ||
-      (log.source_ip && log.source_ip.toLowerCase().includes(lowerSearchTerm)) ||
-      log.log_level.toLowerCase().includes(lowerSearchTerm)
-    );
-  }, [searchTerm, sortedData]);
+
+    const keywords = debouncedSearchTerm.toLowerCase().split(' ').filter(kw => kw);
+
+    return sortedData.filter(log => {
+      const searchableText = [
+        log.message,
+        log.source_identifier,
+        log.log_file,
+        // Basic search in enriched_data: stringify and search
+        // This is a simple approach; more complex objects might need specific field targeting
+        log.enriched_data ? JSON.stringify(log.enriched_data) : ''
+      ].join(' ').toLowerCase();
+
+      // All keywords must be present in the searchableText
+      return keywords.every(keyword => searchableText.includes(keyword));
+    });
+  }, [debouncedSearchTerm, sortedData]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -74,6 +127,7 @@ const EventsTable: React.FC = () => {
   const handleRowClick = (log: LogEntry) => {
     setSelectedEvent(log);
     setIsModalOpen(true);
+    // if (onOpenModal) onOpenModal(log); // Use this if modal state is lifted
   };
 
   const handlePageChange = (newPage: number) => {
@@ -82,46 +136,101 @@ const EventsTable: React.FC = () => {
     }
   };
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: LogEntrySortKey) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
       setSortOrder('asc');
     }
-    setCurrentPage(1); // Reset to first page on sort
+    setCurrentPage(1);
   };
 
-  const getSortIndicator = (key: SortKey) => {
+  const getSortIndicator = (key: LogEntrySortKey) => {
     if (sortKey === key) {
       return sortOrder === 'asc' ? ' ▲' : ' ▼';
     }
     return '';
   };
   
-  const getLogLevelClass = (level: string) => {
-    switch (level.toLowerCase()) {
-      case 'critical': return 'bg-red-700 text-red-100';
-      case 'error': return 'bg-red-500 text-red-100';
-      case 'warning': return 'bg-yellow-500 text-yellow-100';
-      case 'information': return 'bg-blue-500 text-blue-100';
-      default: return 'bg-gray-500 text-gray-100';
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mt-6 text-center text-gray-300">
+        Loading logs...
+      </div>
+    );
+  }
 
+  if (error) {
+    return (
+      <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mt-6 text-center text-red-400">
+        Error: {error}
+      </div>
+    );
+  }
+
+  if (logEntries.length === 0) {
+    return (
+      <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mt-6 text-center text-gray-400">
+        No log entries found.
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-lg mt-6">
-      <h2 className="text-xl font-semibold text-gray-100 mb-4">Event Log Entries</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-100">Event Log Entries</h2>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => exportToCsv(filteredData, generateFilename('csv'))}
+            disabled={filteredData.length === 0 || isLoading}
+            className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md 
+                       focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-green-500
+                       disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+          >
+            <FileText size={14} className="mr-1.5" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => exportToJson(filteredData, generateFilename('json'))}
+            disabled={filteredData.length === 0 || isLoading}
+            className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-md 
+                       focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-purple-500
+                       disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+          >
+            <FileJson size={14} className="mr-1.5" />
+            Export JSON
+          </button>
+        </div>
+      </div>
       
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search logs (Event ID, User, Hostname, Description, IP, Level)..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-          className="w-full p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600 focus:ring-blue-500 focus:border-blue-500"
-        />
+      {/* Search Input and Clear Button */}
+      <div className="mb-4 flex items-center">
+        <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <SearchIcon className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+            type="text"
+            placeholder="Search logs (keywords for message, source, file, enriched data...)"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="w-full p-2 pl-10 rounded-md bg-gray-700 text-gray-200 border border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            />
+            {searchTerm && (
+            <button
+                onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1); // Optionally reset page
+                }}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200"
+                aria-label="Clear search"
+            >
+                <XCircle className="h-5 w-5" />
+            </button>
+            )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -129,49 +238,49 @@ const EventsTable: React.FC = () => {
           <thead className="bg-gray-900">
             <tr>
               {[
-                { label: 'Timestamp', key: 'timestamp' as SortKey },
-                { label: 'Event ID', key: 'event_id' as SortKey },
-                { label: 'Hostname', key: 'hostname' as SortKey },
-                { label: 'User', key: 'user' as SortKey },
-                { label: 'Source IP', key: null }, // Not sorting IP for simplicity now
-                { label: 'Description', key: null }, // Not sorting description
-                { label: 'Log Level', key: 'log_level' as SortKey },
+                { label: 'Timestamp', key: 'timestamp' as LogEntrySortKey, sortable: true },
+                { label: 'Source Identifier', key: 'source_identifier' as LogEntrySortKey, sortable: true },
+                { label: 'Log File', key: 'log_file' as LogEntrySortKey, sortable: true },
+                { label: 'Message', key: null, sortable: false }, // Message not typically sorted
               ].map(col => (
                 <th 
                   key={col.label} 
                   scope="col" 
-                  className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700"
-                  onClick={() => col.key && handleSort(col.key)}
+                  className={`px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider ${col.sortable ? 'cursor-pointer hover:bg-gray-700' : ''}`}
+                  onClick={() => col.sortable && col.key && handleSort(col.key as LogEntrySortKey)}
                 >
                   {col.label}
-                  {col.key && getSortIndicator(col.key)}
+                  {col.sortable && col.key && getSortIndicator(col.key as LogEntrySortKey)}
                 </th>
               ))}
+               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-gray-800 divide-y divide-gray-700">
             {paginatedData.map((log) => (
               <tr 
                 key={log.id}
-                className="hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
-                onClick={() => handleRowClick(log)}
+                className="hover:bg-gray-700 transition-colors duration-150"
               >
-                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">{log.timestamp}</td>
-                <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-100">{log.event_id}</td>
-                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">{log.hostname}</td>
-                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">{log.user}</td>
-                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">{log.source_ip}</td>
-                <td className="px-3 py-3 text-sm text-gray-300 max-w-sm truncate" title={log.description}>{log.description}</td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">
+                  {new Date(log.timestamp).toLocaleString()}
+                </td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-100">{log.source_identifier}</td>
+                <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">{log.log_file}</td>
+                <td className="px-3 py-3 text-sm text-gray-300 max-w-md truncate" title={log.message}>{log.message}</td>
                 <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getLogLevelClass(log.log_level)}`}>
-                        {log.log_level}
-                    </span>
+                   <button 
+                      onClick={() => handleRowClick(log)}
+                      className="text-blue-400 hover:text-blue-300 text-xs"
+                    >
+                      View Details
+                    </button>
                 </td>
               </tr>
             ))}
-            {paginatedData.length === 0 && (
+            {paginatedData.length === 0 && !isLoading && (
               <tr>
-                <td colSpan={7} className="px-3 py-3 text-center text-sm text-gray-400">No log entries found matching your criteria.</td>
+                <td colSpan={5} className="px-3 py-3 text-center text-sm text-gray-400">No log entries found matching your criteria.</td>
               </tr>
             )}
           </tbody>
@@ -187,7 +296,7 @@ const EventsTable: React.FC = () => {
           >
             Previous
           </button>
-          <span>Page {currentPage} of {totalPages}</span>
+          <span>Page {currentPage} of {totalPages} ({filteredData.length} entries)</span>
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
@@ -201,8 +310,14 @@ const EventsTable: React.FC = () => {
       {isModalOpen && selectedEvent && (
         <EventDetailsModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          logEntry={selectedEvent} // Prop name changed to logEntry
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedEvent(null);
+          }}
+          // Assuming EventDetailsModal is updated or can handle LogEntry
+          // If EventDetailsModal expects the old LogEntry type, it needs an update too.
+          // For now, we pass the new LogEntry type.
+          logEntry={selectedEvent} 
         />
       )}
     </div>
