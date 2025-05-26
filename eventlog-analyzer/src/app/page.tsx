@@ -1,19 +1,10 @@
 import React from 'react';
-import React from 'react';
 import TotalEventsWidget from '@/components/dashboard/TotalEventsWidget';
 import CriticalAlertsWidget from '@/components/dashboard/CriticalAlertsWidget';
 import RecentLogSourcesWidget from '@/components/dashboard/RecentLogSourcesWidget'; 
 import SystemHealthWidget from '@/components/dashboard/SystemHealthWidget';
 import LogSourceSelector from '@/components/dashboard/LogSourceSelector';
-import SummaryCard from '@/components/dashboard/SummaryCard'; 
-import ActiveLogSourcesWidget from '@/components/dashboard/ActiveLogSourcesWidget'; // Import the new widget
-import { 
-  FireIcon, 
-  ListBulletIcon, 
-  ComputerDesktopIcon, 
-  ShieldCheckIcon,
-  InformationCircleIcon // Example icon for one of the OverviewWidgets
-} from '@heroicons/react/24/outline';
+import ActiveLogSourcesWidget from '@/components/dashboard/ActiveLogSourcesWidget';
 
 const DashboardPage: React.FC = () => {
   const topEventIdsContent = (
@@ -51,30 +42,22 @@ const DashboardPage: React.FC = () => {
 
       {/* Summary Cards Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <SummaryCard 
-          title="High-Severity Events Today" 
-          content="5 new, 2 unresolved"
-          icon={FireIcon}
-          iconColor="text-red-400"
-        />
-        <SummaryCard 
-          title="Top Event IDs (Last 24h)" 
-          content={topEventIdsContent}
-          icon={ListBulletIcon}
-          iconColor="text-indigo-400"
-        />
-        <SummaryCard 
-          title="Active Hosts Reporting" 
-          content="17 hosts"
-          icon={ComputerDesktopIcon}
-          iconColor="text-teal-400"
-        />
-        <SummaryCard 
-          title="Recent Detections" 
-          content={recentDetectionsContent}
-          icon={ShieldCheckIcon}
-          iconColor="text-amber-400"
-        />
+        <div className="bg-gray-700 p-4 md:p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold text-gray-100 mb-3">High-Severity Events Today</h3>
+          <p className="text-gray-300">5 new, 2 unresolved</p>
+        </div>
+        <div className="bg-gray-700 p-4 md:p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold text-gray-100 mb-3">Top Event IDs (Last 24h)</h3>
+          <div className="text-gray-300">{topEventIdsContent}</div>
+        </div>
+        <div className="bg-gray-700 p-4 md:p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold text-gray-100 mb-3">Active Hosts Reporting</h3>
+          <p className="text-gray-300">17 hosts</p>
+        </div>
+        <div className="bg-gray-700 p-4 md:p-6 rounded-lg shadow-lg">
+          <h3 className="text-lg font-semibold text-gray-100 mb-3">Recent Detections</h3>
+          <div className="text-gray-300">{recentDetectionsContent}</div>
+        </div>
       </div>
       
       {/* Existing placeholders - can be kept or removed based on overall dashboard design */}
@@ -94,8 +77,8 @@ const DashboardPage: React.FC = () => {
         <ul className="space-y-2 text-gray-300">
           <li>User JohnDoe accessed Dashboard - 1 min ago</li>
           <li>System alert triggered: High CPU usage on Server01 - 5 mins ago</li>
-          <li>New log source 'Firewall-East' added - 15 mins ago</li>
-          <li>User JaneSmith ran analysis report 'Security_Anomalies_Q2' - 1 hour ago</li>
+          <li>New log source &apos;Firewall-East&apos; added - 15 mins ago</li>
+          <li>User JaneSmith ran analysis report &apos;Security_Anomalies_Q2&apos; - 1 hour ago</li>
         </ul>
       </div>
     </div>

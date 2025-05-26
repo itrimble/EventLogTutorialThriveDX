@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import logEntryData from '@/lib/data/mock_log_entries.json'; 
 import EventDetailsModal from './EventDetailsModal'; 
 
