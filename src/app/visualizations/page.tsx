@@ -5,13 +5,37 @@ import EventTimeline from '@/components/visualization/EventTimeline';
 import BasicDashboards from '@/components/visualization/BasicDashboards';
 import CorrelationGraphPlaceholder from '@/components/visualization/CorrelationGraphPlaceholder';
 import HeatmapsPlaceholder from '@/components/visualization/HeatmapsPlaceholder';
+import AuthenticationDashboard from '@/components/visualization/AuthenticationDashboard';
+import InsiderThreatDashboard from '@/components/visualization/InsiderThreatDashboard';
+import MalwareDefenseDashboard from '@/components/visualization/MalwareDefenseDashboard';
+import SupplyChainRiskDashboard from '@/components/visualization/SupplyChainRiskDashboard';
+import CASBDashboard from '@/components/visualization/CASBDashboard';
 
-type TabName = 'Timeline' | 'Summary Dashboards' | 'Correlation Graph' | 'Heatmaps';
+type TabName =
+  | 'Timeline'
+  | 'Summary Dashboards'
+  | 'Auth & Access'
+  | 'Insider Threat'
+  | 'Malware Defense'
+  | 'Supply Chain Risk'
+  | 'CASB'
+  | 'Correlation Graph'
+  | 'Heatmaps';
 
 const VisualizationsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabName>('Timeline');
 
-  const tabs: TabName[] = ['Timeline', 'Summary Dashboards', 'Correlation Graph', 'Heatmaps'];
+  const tabs: TabName[] = [
+    'Timeline',
+    'Summary Dashboards',
+    'Auth & Access',
+    'Insider Threat',
+    'Malware Defense',
+    'Supply Chain Risk',
+    'CASB',
+    'Correlation Graph',
+    'Heatmaps'
+  ];
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -19,6 +43,16 @@ const VisualizationsPage: React.FC = () => {
         return <EventTimeline />;
       case 'Summary Dashboards':
         return <BasicDashboards />;
+      case 'Auth & Access':
+        return <AuthenticationDashboard />;
+      case 'Insider Threat':
+        return <InsiderThreatDashboard />;
+      case 'Malware Defense':
+        return <MalwareDefenseDashboard />;
+      case 'Supply Chain Risk':
+        return <SupplyChainRiskDashboard />;
+      case 'CASB':
+        return <CASBDashboard />;
       case 'Correlation Graph':
         return <CorrelationGraphPlaceholder />;
       case 'Heatmaps':
