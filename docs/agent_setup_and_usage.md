@@ -212,3 +212,16 @@ The agent will output log messages to the console. The verbosity depends on `AGE
 
 For more detailed debugging, set `AGENT_LOG_LEVEL = DEBUG` in `config.ini`.
 Check the EventLog Analyzer application's API server logs for errors related to ingestion requests.
+
+## 7. macOS Installation Helper Script
+
+For macOS users, a helper script `install_agent_mac.sh` is available in the project root to automate the setup of a Python virtual environment and installation of dependencies.
+
+To use it:
+1.  Navigate to the project root directory in your terminal.
+2.  Make the script executable (if it isn't already): `chmod +x install_agent_mac.sh`
+3.  Run the script: `./install_agent_mac.sh`
+
+The script will guide you through the setup and provide instructions on how to activate the environment, configure, and run the agent.
+
+**Note for macOS users:** The agent's Windows Event Log collection features will not work on macOS. You should focus on configuring file log sources (`[FileLog:...]` sections) in `agent/config.ini`. The `install_agent_mac.sh` script will remind you of this.
