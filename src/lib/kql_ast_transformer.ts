@@ -6,115 +6,94 @@ import {
   EqualityConditionNode, ComparisonConditionNode, ComparisonOperator,
   StringOperationConditionNode, StringOperationType,
   LogicalConditionNode, LogicalOperator,
-  // New AST Node types from kql_ast.ts
   SearchNode, ExtendNode, DistinctNode, TopNode, ExtendedColumn, KqlExpressionValue,
   InConditionNode, MatchesRegexConditionNode
 } from './kql_ast';
 
-// --- Actual "Rust KQL AST" Interfaces (Hypothesized from serde_json on irtimmer/rust-kql) ---
+// --- Canonical "Actual Wasm AST" Interfaces (Hypothesized from irtimmer/rust-kql + serde_json defaults) ---
+// Using snake_case for fields from Rust AST where applicable.
+
+export interface ActualRustKqlIdentifier { value: string; }
 
 export type ActualRustKqlLiteralValue =
   | { String: string }
   | { Long: number }
   | { Real: number }
   | { Bool: boolean }
-  | { Datetime: string }
-  | { Timespan: string }
+  | { Datetime: string } // ISO 8601 string
+  | { Timespan: string } // e.g., "1d", "2h30m"
   | { Dynamic: any[] | object | null }
   | { Null: null };
 
-export interface ActualRustKqlArrayLiteral {
+export interface ActualRustKqlArrayLiteral { // For 'in' operator
     Array: ActualRustKqlLiteralValue[];
 }
 
 export type ActualRustKqlExpression =
   | { Literal: ActualRustKqlLiteralValue }
   | { ArrayLiteral: ActualRustKqlArrayLiteral }
-  | { Column: { name: { value: string } } }
+  | { Column: { name: ActualRustKqlIdentifier } }
   | { Path: { expression: ActualRustKqlExpression; accessors: ActualRustKqlPathAccessor[] } }
   | { BinaryExpression: { left: ActualRustKqlExpression; op: ActualRustKqlBinaryOperator; right: ActualRustKqlExpression } }
   | { FunctionCall: { name: ActualRustKqlFunctionName; args: ActualRustKqlExpression[] } };
+  // Add UnaryExpression, etc. if needed by queries
 
 export type ActualRustKqlPathAccessor =
-  | { Member: { name: { value: string } } }
+  | { Member: { name: ActualRustKqlIdentifier } }
   | { Index: { index: ActualRustKqlExpression } };
 
-export type ActualRustKqlBinaryOperator =
-  | "Add" | "Sub" | "Mul" | "Div"
+export type ActualRustKqlBinaryOperator = // Matches BinaryOperatorKind in irtimmer/rust-kql
+  | "Add" | "Sub" | "Mul" | "Div" | "Mod"
   | "Equal" | "NotEqual" | "GreaterThan" | "LessThan" | "GreaterThanOrEqual" | "LessThanOrEqual"
   | "And" | "Or"
   | "Contains" | "NotContains" | "ContainsCs" | "NotContainsCs"
   | "StartsWith" | "NotStartsWith" | "StartsWithCs" | "NotStartsWithCs"
   | "EndsWith" | "NotEndsWith" | "EndsWithCs" | "NotEndsWithCs"
-  | "Has" | "HasCs"
+  | "Has" | "HasCs" | "HasPrefix" | "HasSuffix" // More KQL specific string/set ops
   | "In" | "NotIn" | "InCs" | "NotInCs"
   | "MatchesRegex";
 
-export type ActualRustKqlFunctionName = { value: string } | string;
+export type ActualRustKqlFunctionName = ActualRustKqlIdentifier; // e.g., { value: "count" }
 
-export interface ActualRustKqlNamedExpression {
+export interface ActualRustKqlNamedExpression { // Used in project, summarize aggregations, extend
   expression: ActualRustKqlExpression;
-  alias: { name: { value: string } } | null;
+  alias: ActualRustKqlIdentifier | null; // `Option<Identifier>` in Rust
 }
 
 export interface ActualRustKqlSortClause {
   expression: ActualRustKqlExpression;
-  sort_order?: 'Asc' | 'Desc';
-  nulls_first?: boolean | null; // `irtimmer/rust-kql` uses `Option<bool>` for `nulls_first`
+  sort_order?: "Asc" | "Desc"; // `Option<SortOrder>` in Rust
+  nulls_first?: boolean | null; // `Option<bool>` in Rust (true for NULLS FIRST, false for NULLS LAST)
 }
 
-// New Tabular Operators
-export interface ActualRustKqlSearchOperator {
-    search_term: ActualRustKqlLiteralExpression;
-    columns: ActualRustKqlColumnExpression[] | null;
-}
-
-export interface ActualRustKqlExtendOperator {
-    columns: ActualRustKqlNamedExpression[];
-}
-
-export interface ActualRustKqlDistinctOperator {
-    columns: ActualRustKqlExpression[];
-}
-
-export interface ActualRustKqlTopOperator {
-    count: ActualRustKqlExpression;
-    by_expression: ActualRustKqlNamedExpression;
-    sort_order?: 'Asc' | 'Desc';
-    with_others?: ActualRustKqlLiteralExpression; // KQL `withothers` takes a boolean
-}
-
-export type ActualRustKqlLiteralExpression = { Literal: ActualRustKqlLiteralValue };
-export type ActualRustKqlColumnExpression = { Column: { name: { value: string } } };
-
+// Tabular Operators: Each is an object with a single key being the operator name (Rust enum style)
 export type ActualRustKqlTabularOperator =
   | { Where: { predicate: ActualRustKqlExpression } }
   | { Project: { columns: ActualRustKqlNamedExpression[] } }
-  | { Take: { count: ActualRustKqlExpression } }
+  | { Limit: { count: ActualRustKqlExpression } } // `Take` in KQL, `Limit` in irtimmer/rust-kql AST
   | { Summarize: { aggregations: ActualRustKqlNamedExpression[]; by_clauses: ActualRustKqlNamedExpression[] } }
-  | { SortBy: { clauses: ActualRustKqlSortClause[] } }
-  | { Search: ActualRustKqlSearchOperator }
-  | { Extend: ActualRustKqlExtendOperator }
-  | { Distinct: ActualRustKqlDistinctOperator }
-  | { Top: ActualRustKqlTopOperator };
+  | { SortBy: { clauses: ActualRustKqlSortClause[] } } // `SortBy` in irtimmer/rust-kql AST
+  | { Search: { search_term: ActualRustKqlExpression; columns: ActualRustKqlExpression[] | null } } // search_term likely Literal String
+  | { Extend: { columns: ActualRustKqlNamedExpression[] } }
+  | { Distinct: { columns: ActualRustKqlExpression[] } } // columns are expressions (usually Column or Path)
+  | { Top: { count: ActualRustKqlExpression; by_expression: ActualRustKqlNamedExpression; sort_order?: "Asc" | "Desc"; with_others: ActualRustKqlExpression | null } };
 
-export interface ActualRustKqlSource {
-    name: { value: string };
-    alias: { name: { value: string } } | null;
+export interface ActualRustKqlSource { // `source: Source` in irtimmer/rust-kql TabularExpression
+    name: ActualRustKqlIdentifier;
+    alias: ActualRustKqlIdentifier | null;
 }
 
-export type ActualRustKqlStatement =
+export type ActualRustKqlStatement = // We only care about TabularExpression for now
   | { TabularExpression: { source: ActualRustKqlSource; operations: ActualRustKqlTabularOperator[] } }
-  | { Let: { name: { value: string }; expression: ActualRustKqlExpression } };
+  | { Let: { name: ActualRustKqlIdentifier; expression: ActualRustKqlExpression } };
 
-export interface ActualRustKqlQuery {
+export interface ActualRustKqlQuery { // Top-level structure from `parse_query`
   statements: ActualRustKqlStatement[];
 }
 
-
 // --- Transformation Helper Functions ---
 
-function extractActualLiteralValue(literalExpr: ActualRustKqlLiteralExpression): string | number | boolean | null {
+function extractActualLiteralValue(literalExpr: { Literal: ActualRustKqlLiteralValue }): string | number | boolean | null {
   const literalVal = literalExpr.Literal;
   if ("String" in literalVal) return literalVal.String;
   if ("Long" in literalVal) return literalVal.Long;
@@ -136,46 +115,41 @@ function extractActualFieldNameOrPath(expr: ActualRustKqlExpression): string {
       if ("Member" in accessor) {
         currentPath += `.${accessor.Member.name.value}`;
       } else if ("Index" in accessor) {
-        if ("Literal" in accessor.Index.index && ("String" in accessor.Index.index.Literal || "Long" in accessor.Index.index.Literal)) {
+        // For simplicity, assume index is a literal string or number for parsed_fields keys
+        if ("Literal" in accessor.Index.index) {
             const literalValue = extractActualLiteralValue({Literal: accessor.Index.index.Literal});
             currentPath += `.${literalValue}`;
         } else {
-            console.warn("[ASTTransformer] Non-literal string/long index in Path not fully supported for name extraction, using placeholder.");
+            console.warn("[ASTTransformer] Non-literal index in Path not fully supported for name extraction, using placeholder.");
             currentPath += `.[index_expr]`;
         }
       }
     }
     return currentPath;
   }
-  // This function is primarily for getting simple identifiers for columns, paths, or sort/group by keys.
-  // More complex expressions (like function calls or binary ops) used as fields are handled by transformActualRustExpressionToKqlExpressionValue.
-  console.warn("[ASTTransformer] Cannot extract simple field name/path from complex expression for this context:", JSON.stringify(expr).substring(0,100));
-  throw new Error(`Unsupported expression type for simple field/path extraction: ${Object.keys(expr)[0]}`);
+  console.warn("[ASTTransformer] Cannot extract simple field name/path from expression for general use:", JSON.stringify(expr).substring(0,100));
+  throw new Error(`Unsupported expression type for field/path extraction: ${Object.keys(expr)[0]}`);
 }
 
-// --- KQL Function and Operator Mapping to SQL (for RawSqlExpression in Extend) ---
-function mapActualRustKqlFuncToSql(kqlFuncNameValue: ActualRustKqlFunctionName): string {
-    const kqlFuncName = (typeof kqlFuncNameValue === 'string' ? kqlFuncNameValue : kqlFuncNameValue.value).toLowerCase();
+function mapActualRustKqlFuncToSql(kqlFuncName: ActualRustKqlFunctionName): string {
+    const name = (typeof kqlFuncName === 'string' ? kqlFuncName : kqlFuncName.value).toLowerCase();
     const map: Record<string, string> = {
         "toupper": "UPPER", "tolower": "LOWER", "strcat": "CONCAT", "now": "NOW",
-        "gethour": "EXTRACT(HOUR FROM", // Special handling for argument needed
-        "datetime_part": "EXTRACT", // e.g. datetime_part('day', timestamp) -> EXTRACT(DAY FROM timestamp)
-        "ago": "NOW() - INTERVAL" // e.g. ago(5m) -> NOW() - INTERVAL '5 minutes' (arg needs formatting)
+        "gethour": "EXTRACT(HOUR FROM", "datetime_part": "EXTRACT", "ago": "NOW() - INTERVAL"
     };
-    return map[kqlFuncName] || kqlFuncName.toUpperCase();
+    return map[name] || name.toUpperCase();
 }
 
-function mapActualRustKqlBinaryOpToSql(kqlOpName: string): string {
-    const map: Record<string, string> = { "Add": "+", "Sub": "-", "Mul": "*", "Div": "/" };
+function mapActualRustKqlBinaryOpToSqlOp(kqlOpName: ActualRustKqlBinaryOperator): string {
+    const map: Record<string, string> = { "Add": "+", "Sub": "-", "Mul": "*", "Div": "/", "Mod": "%" };
     return map[kqlOpName] || kqlOpName; // Default if not an arithmetic op for extend
 }
 
-// Transform expressions for ExtendNode values
 function transformActualRustExpressionToKqlExpressionValue(expr: ActualRustKqlExpression): KqlExpressionValue | null {
     if ("Column" in expr) {
         return { type: 'ColumnReference', columnName: expr.Column.name.value };
     }
-    if ("Path" in expr) { // Treat path as a column reference
+    if ("Path" in expr) {
         return { type: 'ColumnReference', columnName: extractActualFieldNameOrPath(expr) };
     }
     if ("Literal" in expr) {
@@ -183,28 +157,29 @@ function transformActualRustExpressionToKqlExpressionValue(expr: ActualRustKqlEx
     }
     if ("FunctionCall" in expr) {
         const funcCall = expr.FunctionCall;
-        const kqlFuncName = (typeof funcCall.name === 'string' ? funcCall.name : funcCall.name.value);
+        const kqlFuncName = funcCall.name;
         const sqlFuncName = mapActualRustKqlFuncToSql(kqlFuncName);
 
         const argsSql = funcCall.args.map(arg => {
             const transformedArg = transformActualRustExpressionToKqlExpressionValue(arg);
-            if (!transformedArg) throw new Error(`Failed to transform argument for ${kqlFuncName}`);
-            if (transformedArg.type === 'ColumnReference') return `"${transformedArg.columnName}"`; // Quote column names
+            if (!transformedArg) throw new Error(`Failed to transform argument for ${sqlFuncName}`);
+            if (transformedArg.type === 'ColumnReference') return `"${transformedArg.columnName}"`;
             if (transformedArg.type === 'Literal') return formatSqlValueForExpression(transformedArg.value);
             if (transformedArg.type === 'RawSqlExpression') return transformedArg.expressionString;
-            return 'NULL'; // Fallback
+            return "NULL";
         });
 
-        if (kqlFuncName.toLowerCase() === 'gethour') {
+        const funcNameStr = (typeof kqlFuncName === 'string' ? kqlFuncName : kqlFuncName.value).toLowerCase();
+        if (funcNameStr === 'gethour') {
              return { type: 'RawSqlExpression', expressionString: `${sqlFuncName} ${argsSql[0]})` };
         }
-        if (kqlFuncName.toLowerCase() === 'datetime_part') {
+        if (funcNameStr === 'datetime_part') {
              if (argsSql.length < 2) throw new Error("datetime_part expects at least 2 arguments");
              return { type: 'RawSqlExpression', expressionString: `${sqlFuncName}(${argsSql[0]} FROM ${argsSql[1]})` };
         }
-        if (kqlFuncName.toLowerCase() === 'ago') {
-            if (argsSql.length === 1) { // KQL ago(timespan_literal_string)
-                return { type: 'RawSqlExpression', expressionString: `${sqlFuncName} ${argsSql[0]}` }; // e.g. NOW() - INTERVAL '5m'
+        if (funcNameStr === 'ago') {
+            if (argsSql.length === 1) {
+                return { type: 'RawSqlExpression', expressionString: `${sqlFuncName} ${argsSql[0]}` };
             }
         }
         return { type: 'RawSqlExpression', expressionString: `${sqlFuncName}(${argsSql.join(', ')})` };
@@ -213,7 +188,7 @@ function transformActualRustExpressionToKqlExpressionValue(expr: ActualRustKqlEx
         const be = expr.BinaryExpression;
         const leftVal = transformActualRustExpressionToKqlExpressionValue(be.left);
         const rightVal = transformActualRustExpressionToKqlExpressionValue(be.right);
-        const opSql = mapActualRustKqlBinaryOpToSql(be.op);
+        const opSql = mapActualRustKqlBinaryOpToSqlOp(be.op);
 
         if (leftVal && rightVal) {
             const leftStr = leftVal.type === 'RawSqlExpression' ? leftVal.expressionString : leftVal.type === 'ColumnReference' ? `"${leftVal.columnName}"` : String(leftVal.value);
@@ -221,7 +196,7 @@ function transformActualRustExpressionToKqlExpressionValue(expr: ActualRustKqlEx
             return { type: 'RawSqlExpression', expressionString: `(${leftStr} ${opSql} ${rightStr})`};
         }
     }
-    console.warn("[ASTTransformer] Unsupported expression type for KqlExpressionValue:", JSON.stringify(expr).substring(0,100));
+    console.warn("[ASTTransformer] Unsupported ActualRustKqlExpression type for KqlExpressionValue:", JSON.stringify(expr).substring(0,100));
     return null;
 }
 
@@ -232,14 +207,13 @@ function formatSqlValueForExpression(value: string | number | boolean | null): s
     return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-
 function transformActualRustExpressionToConditionNode(expr: ActualRustKqlExpression): ConditionNode | null {
   if (expr.BinaryExpression) {
     const be = expr.BinaryExpression;
     const leftOperand = be.left;
     const rightOperand = be.right;
 
-    if (be.op.toLowerCase() === 'and' || be.op.toLowerCase() === 'or') {
+    if (be.op === 'And' || be.op === 'Or') { // Match exact Rust AST operator names
       const leftCondition = transformActualRustExpressionToConditionNode(leftOperand);
       const rightCondition = transformActualRustExpressionToConditionNode(rightOperand);
       if (!leftCondition || !rightCondition) return null;
@@ -252,25 +226,26 @@ function transformActualRustExpressionToConditionNode(expr: ActualRustKqlExpress
 
     const field = extractActualFieldNameOrPath(leftOperand);
 
-    if (be.op.toLowerCase() === 'in' || be.op.toLowerCase() === 'incs' || be.op.toLowerCase() === 'notin' || be.op.toLowerCase() === 'notincs') {
+    if (be.op === 'In' || be.op === 'InCs' || be.op === 'NotIn' || be.op === 'NotInCs') {
         if (!("ArrayLiteral" in rightOperand)) {
-            console.error("[ASTTransformer] Expected ArrayLiteral for 'in'-like operator's right side, got:", JSON.stringify(rightOperand));
+            console.error("[ASTTransformer] Expected ArrayLiteral for 'In'-like operator's right side, got:", JSON.stringify(rightOperand));
             return null;
         }
         const values = rightOperand.ArrayLiteral.Array.map(litVal => extractActualLiteralValue({Literal: litVal}));
-        // TODO: Our InConditionNode doesn't have 'NotIn'. This would require AST update or different transformation.
-        // For now, treating NotIn as In for structure, SQL transpiler would need to negate.
-        if (be.op.toLowerCase().startsWith('notin')) console.warn(`[ASTTransformer] 'NotIn' operator functionality not fully implemented in target AST/SQL for '${field}'. Transforming as 'In'.`);
+        if (be.op === 'NotIn' || be.op === 'NotInCs') {
+             console.warn(`[ASTTransformer] 'NotIn' operator functionality not fully implemented in target AST/SQL for '${field}'. Transforming as 'In' and negating would be complex.`);
+             // For a full solution, our ConditionNode would need a 'negated' flag or a NotInConditionNode
+        }
         return {
             type: 'In',
             field,
             values,
-            caseSensitive: be.op.toLowerCase() === 'incs' || be.op.toLowerCase() === 'notincs',
+            caseSensitive: be.op === 'InCs' || be.op === 'NotInCs',
         } as InConditionNode;
     }
-    if (be.op.toLowerCase() === 'matchesregex') {
-        if (!("Literal" in rightOperand && "String" in rightOperand.Literal)) {
-             console.error("[ASTTransformer] Expected String Literal for 'matches regex' operator's right side, got:", JSON.stringify(rightOperand));
+    if (be.op === 'MatchesRegex') {
+        if (!("Literal" in rightOperand && ("String" in rightOperand.Literal))) { // Check for String in Literal
+             console.error("[ASTTransformer] Expected String Literal for 'MatchesRegex' operator's right side, got:", JSON.stringify(rightOperand));
             return null;
         }
         return {
@@ -289,7 +264,7 @@ function transformActualRustExpressionToConditionNode(expr: ActualRustKqlExpress
     switch (be.op) {
       case 'Equal': return { type: 'Equals', field, value } as EqualityConditionNode;
       case 'GreaterThan': case 'LessThan': case 'GreaterThanOrEqual': case 'LessThanOrEqual': case 'NotEqual':
-        if (value === null || (typeof value !== 'string' && typeof value !== 'number')) { // null comparison uses IS NULL/IS NOT NULL
+        if (value === null || (typeof value !== 'string' && typeof value !== 'number')) {
              console.error(`[ASTTransformer] Invalid value type for comparison operator ${be.op}:`, value); return null;
         }
         let opSymbol: ComparisonOperator = '==' ;
@@ -318,10 +293,10 @@ function transformActualRustExpressionToConditionNode(expr: ActualRustKqlExpress
          if (typeof value !== 'string') return null;
          return {
             type: 'StringOperation', field,
-            operator: 'contains',
+            operator: 'contains', // Map KQL 'has' to our 'contains'
             value, caseSensitive: be.op === 'HasCs',
          } as StringOperationConditionNode;
-      // TODO: Handle NotContains, NotStartsWith, NotEndsWith variants
+      // TODO: Handle NotContains, NotStartsWith, NotEndsWith, HasPrefix, HasSuffix etc.
       default:
         console.error(`[ASTTransformer] Unsupported binary operator from Actual Rust AST: ${be.op}`);
         return null;
@@ -342,12 +317,12 @@ function transformActualRustOperator(op: ActualRustKqlTabularOperator): Operatio
     );
     return { type: 'Project', fields } as ProjectNode;
   }
-  if ("Take" in op) {
-    if (op.Take.count && "Literal" in op.Take.count && ("Long" in op.Take.count.Literal || "Number" in op.Take.count.Literal)) {
-      const countVal = ("Long" in op.Take.count.Literal) ? op.Take.count.Literal.Long : (op.Take.count.Literal as any).Number;
-      return { type: 'Take', count: countVal } as TakeNode;
+  if ("Limit" in op) { // Renamed from Take to Limit to match irtimmer/rust-kql
+    if (op.Limit.count && "Literal" in op.Limit.count && ("Long" in op.Limit.count.Literal || "Number" in op.Limit.count.Literal)) {
+      const countVal = ("Long" in op.Limit.count.Literal) ? op.Limit.count.Literal.Long : (op.Limit.count.Literal as any).Number;
+      return { type: 'Take', count: countVal } as TakeNode; // Still TakeNode in our AST
     }
-    console.error("[ASTTransformer] Invalid Take operator structure from Actual Rust AST:", op);
+    console.error("[ASTTransformer] Invalid Take/Limit operator structure from Actual Rust AST:", op);
     return null;
   }
   if ("Summarize" in op) {
@@ -360,13 +335,13 @@ function transformActualRustOperator(op: ActualRustKqlTabularOperator): Operatio
       let funcName = (typeof funcCall.name === 'string' ? funcCall.name : funcCall.name.value).toLowerCase();
 
       return {
-        newColumnName: namedAggExpr.alias!.name.value, // KQL summarize always requires an alias for aggregations
+        newColumnName: namedAggExpr.alias!.name.value,
         function: funcName as AggFunctionType,
         field: funcCall.args.length > 0 ? extractActualFieldNameOrPath(funcCall.args[0]) : undefined,
       };
     });
     const groupByFields: GroupByItem[] = summarizeOp.by_clauses.map(namedExpr => {
-        const alias = namedExpr.alias!.name.value; // KQL `summarize by X=Y` means alias is X. If `by Z`, alias is Z.
+        const alias = namedExpr.alias!.name.value;
         const expr = namedExpr.expression;
         if ("FunctionCall" in expr && (typeof expr.FunctionCall.name === 'string' ? expr.FunctionCall.name : expr.FunctionCall.name.value).toLowerCase() === 'date_trunc') {
             const funcCall = expr.FunctionCall;
@@ -383,7 +358,7 @@ function transformActualRustOperator(op: ActualRustKqlTabularOperator): Operatio
                 alias: alias,
             } as GroupByExpression;
         } else if ("Column" in expr || "Path" in expr) {
-            return alias; // Use the alias as the group by key, which refers to the original column or path
+            return alias; // Use the alias as the group by key (KQL: `by Title=ColumnName`)
         }
         throw new Error(`Unsupported groupBy expression structure from Actual Rust AST: ${JSON.stringify(expr)}`);
     });
@@ -395,15 +370,16 @@ function transformActualRustOperator(op: ActualRustKqlTabularOperator): Operatio
       const sortField = extractActualFieldNameOrPath(c.expression);
       const order = c.sort_order?.toLowerCase() as SortOrder | undefined;
       let nulls: NullsOrder | undefined = undefined;
-      if (c.nulls === 'First') nulls = 'first';
-      else if (c.nulls === 'Last') nulls = 'last';
+      if (c.nulls_first === true) nulls = 'first';
+      else if (c.nulls_first === false) nulls = 'last';
       return { field: sortField, order, nulls };
     });
     return { type: 'Sort', clauses } as SortNode;
   }
   if ("Search" in op) {
       const searchOp = op.Search;
-      if (!("Literal" in searchOp.search_term) || !("String" in searchOp.search_term.Literal)) {
+      // Ensure search_term is Literal String
+      if (!("Literal" in searchOp.search_term && "String" in searchOp.search_term.Literal)) {
           console.error("[ASTTransformer] Search term must be a string literal."); return null;
       }
       const searchTerm = searchOp.search_term.Literal.String;
@@ -418,7 +394,7 @@ function transformActualRustOperator(op: ActualRustKqlTabularOperator): Operatio
               throw new Error(`Failed to transform expression for extend column: ${namedExpr.alias?.name.value}`);
           }
           return {
-              name: namedExpr.alias!.name.value, // KQL extend requires an alias
+              name: namedExpr.alias!.name.value,
               expression: exprValue
           };
       });
