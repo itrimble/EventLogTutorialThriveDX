@@ -140,14 +140,17 @@ The agent uses a configuration file named `config.ini` located in the same direc
 1.  Ensure your virtual environment is activated (see step 3.1).
 2.  Ensure `agent/config.ini` is configured correctly.
 3.  Navigate to the directory containing `event_log_agent.py` (e.g., the `agent` directory or project root if running as `python agent/event_log_agent.py`).
-4.  Run the script:
+4.  Run the script **from the project root directory**:
+
+    Ensure your virtual environment is activated. Then, execute the agent using `python3`:
 
     ```bash
-    # If you are in the 'agent' directory:
-    python event_log_agent.py
-    # Or from the project root:
-    # python agent/event_log_agent.py
+    # From the project root directory:
+    python3 agent/event_log_agent.py
     ```
+
+    **Important:** Always use the `python3` interpreter to start the agent (e.g., `python3 agent/event_log_agent.py`). Do not attempt to run the script directly (e.g.,`./agent/event_log_agent.py`) even if it has execute permissions. This can lead to unexpected behavior or conflicts with other system commands if your environment is configured in a certain way (e.g. ImageMagick's `import` command).
+    The script includes a shebang (`#!/usr/bin/env python3`) for robustness and to indicate it's a Python 3 script, but invoking it with `python3 ...` is the recommended and safest method.
 
 The agent will start, load the configuration, and begin collecting and sending logs based on the enabled sections and their intervals. Press `Ctrl+C` to stop the agent.
 
