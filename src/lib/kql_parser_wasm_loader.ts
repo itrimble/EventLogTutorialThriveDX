@@ -1,19 +1,26 @@
 // src/lib/kql_parser_wasm_loader.ts
 
-import { QueryNode } from './kql_ast';
+import { QueryNode } from './kql_ast'; // Our target AST
 import {
     transformRustAstToQueryNode,
-    ActualRustKqlQuery, // Import the new top-level Actual Rust AST type
+    ActualRustKqlQuery,
     ActualRustKqlStatement,
     ActualRustKqlTabularOperator,
     ActualRustKqlExpression,
     ActualRustKqlLiteralValue,
     ActualRustKqlNamedExpression,
     ActualRustKqlSortClause,
-    ActualRustKqlBinaryOperator,
-    ActualRustKqlFunctionName,
+    ActualRustKqlSource,
+    ActualRustKqlSearchOperator,
+    ActualRustKqlExtendOperator,
+    ActualRustKqlDistinctOperator,
+    ActualRustKqlTopOperator,
+    ActualRustKqlArrayLiteral,
+    ActualRustKqlLiteralExpression,
+    ActualRustKqlColumnExpression,
     ActualRustKqlPathAccessor,
-    ActualRustKqlSource
+    ActualRustKqlFunctionName,
+    ActualRustKqlBinaryOperator
 } from './kql_ast_transformer';
 
 // Simulates calling the Wasm module's exported function.
@@ -22,130 +29,189 @@ async function simulatedWasmCall(kqlQuery: string): Promise<string> {
     const normalizedQuery = kqlQuery.trim().replace(/\s+/g, ' ').toLowerCase();
     let rustAstObject: ActualRustKqlQuery | null = null;
 
-    // Helper to create Literal expressions matching ActualRustKqlLiteralValue variants
-    const RLiteral = (value: string | number | boolean | null): { Literal: ActualRustKqlLiteralValue } => {
-        if (typeof value === 'string') {
-            // Crude check for ISO date string to map to Datetime, otherwise String
-            if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) return { Literal: { Datetime: value } };
-            return { Literal: { String: value } };
-        }
-        if (typeof value === 'number') {
-            // In KQL, 'long' and 'real' are distinct. We'll use Long for integers, Real for floats if needed.
-            // For simplicity, mock KQL often uses numbers that could be Long.
-            return { Literal: { Long: value } };
-        }
-        if (typeof value === 'boolean') return { Literal: { Boolean: value } };
-        if (value === null) return { Literal: { Null: null } };
-        throw new Error(`Unsupported literal type for mock: ${value}`);
-    };
-    const RCol = (name: string): { Column: { name: { value: string } } } => ({ Column: { name: { value: name } } });
+    // --- Helper functions to construct "Actual Rust AST" nodes ---
+    const RIdent = (name: string): { value: string } => ({ value: name });
+    const RFuncIdent = (name: string): ActualRustKqlFunctionName => ({ value: name }); // Assuming simple string for now
 
-    // Path helper: e.g., parsed_fields.WorkstationName
-    // ActualRustKqlPath: { expression: {Column: {name: "parsed_fields"}}, accessors: [{Member: {name: "WorkstationName"}}]}
+    const RLiteral = (value: string | number | boolean | null): ActualRustKqlLiteralExpression => {
+        let literalValue: ActualRustKqlLiteralValue;
+        if (typeof value === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value) || /^\d{4}-\d{2}-\d{2}$/.test(value)) literalValue = { Datetime: value };
+            else if (/^\d+(d|h|m|s|ms|us|ns)$/.test(value)) literalValue = { Timespan: value };
+            else literalValue = { String: value };
+        } else if (typeof value === 'number') {
+            literalValue = Number.isInteger(value) ? { Long: value } : { Real: value };
+        } else if (typeof value === 'boolean') {
+            literalValue = { Bool: value };
+        } else if (value === null) {
+            literalValue = { Null: null };
+        } else {
+            throw new Error(`Unsupported literal type for mock RLiteral: ${value}`);
+        }
+        return { Literal: literalValue };
+    };
+
+    const RCol = (name: string): ActualRustKqlColumnExpression => ({ Column: { name: RIdent(name) } });
+
     const RPath = (objectName: string, memberName: string): { Path: { expression: ActualRustKqlExpression, accessors: ActualRustKqlPathAccessor[] } } => ({
         Path: {
             expression: RCol(objectName),
-            accessors: [{ Member: { name: { value: memberName } } }]
+            accessors: [{ Member: { name: RIdent(memberName) } }]
         }
     });
 
-    // Helper for NamedExpression
     const RNamedExpr = (alias: string, expression: ActualRustKqlExpression): ActualRustKqlNamedExpression => ({
-        alias: { name: { value: alias } },
+        alias: { name: RIdent(alias) },
         expression
     });
-    const RNamedCol = (name: string): ActualRustKqlNamedExpression => ({ // For project col1 (becomes col1=col1)
-        alias: { name: { value: name } }, // In irtimmer/rust-kql, if no alias, alias is same as column name string.
-                                        // Or alias can be null if it's just `expression`
+    const RNamedCol = (name: string): ActualRustKqlNamedExpression => ({
+        alias: { name: RIdent(name) },
         expression: RCol(name)
+    });
+    const RFuncCall = (name: string, args: ActualRustKqlExpression[]): { FunctionCall: { name: ActualRustKqlFunctionName, args: ActualRustKqlExpression[] } } => ({
+        FunctionCall: { name: RFuncIdent(name), args }
+    });
+    const RArrayLiteral = (values: (string | number | boolean | null)[]): { ArrayLiteral: ActualRustKqlArrayLiteral } => ({
+        ArrayLiteral: { Array: values.map(v => RLiteral(v).Literal) }
+    });
+    const RBinaryExpr = (left: ActualRustKqlExpression, op: ActualRustKqlBinaryOperator, right: ActualRustKqlExpression): { BinaryExpression: any } => ({
+        BinaryExpression: { left, op, right }
     });
 
 
     // --- Define ActualRustKql ASTs for supported queries ---
     let mainTabularExpression: { source: ActualRustKqlSource; operations: ActualRustKqlTabularOperator[] } | null = null;
 
+    // --- Existing Queries (adapted to new helpers) ---
     if (normalizedQuery === 'events | take 10') {
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
+            source: { name: RIdent('events'), alias: null },
             operations: [ { Take: { count: RLiteral(10) } } ],
         };
     } else if (normalizedQuery === 'events | where event_type_id == "4624" | project timestamp, user_id, ip_address | take 5') {
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
+            source: { name: RIdent('events'), alias: null },
             operations: [
-                { Where: { predicate: { BinaryExpression: { left: RCol('event_type_id'), op: 'Equal', right: RLiteral('4624') } } } },
+                { Where: { predicate: RBinaryExpr(RCol('event_type_id'), 'Equal', RLiteral('4624')) } },
                 { Project: { columns: [ RNamedCol('timestamp'), RNamedCol('user_id'), RNamedCol('ip_address') ]}},
                 { Take: { count: RLiteral(5) } },
             ],
         };
     } else if (normalizedQuery === 'events | where event_type_id == "4625" | summarize attempts = count() by user_id | sort by attempts desc | take 10') {
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
+            source: { name: RIdent('events'), alias: null },
             operations: [
-                { Where: { predicate: { BinaryExpression: { left: RCol('event_type_id'), op: 'Equal', right: RLiteral('4625') } } } },
+                { Where: { predicate: RBinaryExpr(RCol('event_type_id'), 'Equal', RLiteral('4625')) } },
                 { Summarize: {
-                    aggregations: [ RNamedExpr('attempts', { FunctionCall: { name: 'count', args: [] } }) ],
-                    by_clauses: [ RNamedExpr('user_id', RCol('user_id')) ], // `by user_id` is `by user_id = user_id`
+                    aggregations: [ RNamedExpr('attempts', RFuncCall('count', [])) ],
+                    by_clauses: [ RNamedExpr('user_id', RCol('user_id')) ], // KQL `by X` is `by X=X`
                 }},
-                { SortBy: { clauses: [ // Note: SortBy is the op name from irtimmer/rust-kql
-                    { expression: RCol('attempts'), order: 'Desc' } as ActualRustKqlSortClause
-                ]}},
+                { SortBy: { clauses: [ { expression: RCol('attempts'), sort_order: 'Desc' } ]}},
                 { Take: { count: RLiteral(10) } },
             ],
         };
     } else if (normalizedQuery === "events | summarize count_ = count() by timestamp_hour = date_trunc('hour', timestamp), event_source_name | sort by timestamp_hour asc") {
-        const dateTruncNamedExpr: ActualRustKqlNamedExpression = RNamedExpr('timestamp_hour', {
-            FunctionCall: {
-                name: 'date_trunc',
-                args: [ RLiteral('hour'), RCol('timestamp') ]
-            }
-        });
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
+            source: { name: RIdent('events'), alias: null },
             operations: [
                 { Summarize: {
-                    aggregations: [ RNamedExpr('count_', { FunctionCall: { name: 'count', args: [] } }) ],
+                    aggregations: [ RNamedExpr('count_', RFuncCall('count', [])) ],
                     by_clauses: [
-                        dateTruncNamedExpr,
+                        RNamedExpr('timestamp_hour', RFuncCall('date_trunc', [RLiteral('hour'), RCol('timestamp')])),
                         RNamedExpr('event_source_name', RCol('event_source_name')),
                     ],
                 }},
-                { SortBy: { clauses: [
-                    { expression: RCol('timestamp_hour'), order: 'Asc' } as ActualRustKqlSortClause
-                ]}},
+                { SortBy: { clauses: [ { expression: RCol('timestamp_hour'), sort_order: 'Asc' } ]}},
             ],
         };
     } else if (normalizedQuery === 'events | where parsed_fields.logontype == 2 | project timestamp, user_id, parsed_fields.workstationname') {
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
+            source: { name: RIdent('events'), alias: null },
             operations: [
-                { Where: { predicate: { BinaryExpression: {
-                    left: RPath('parsed_fields', 'LogonType'),
-                    op: 'Equal',
-                    right: RLiteral(2) // KQL numbers are 'long' or 'real'
-                }}}},
+                { Where: { predicate: RBinaryExpr(RPath('parsed_fields', 'LogonType'), 'Equal', RLiteral(2)) }},
                 { Project: { columns: [
-                    RNamedCol('timestamp'),
-                    RNamedCol('user_id'),
+                    RNamedCol('timestamp'), RNamedCol('user_id'),
                     RNamedExpr('parsed_fields.WorkstationName', RPath('parsed_fields', 'WorkstationName')),
                 ]}},
             ]
         };
     } else if (normalizedQuery === 'events | where success == true') {
         mainTabularExpression = {
-            source: { name: { value: 'events' }, alias: null },
-            operations: [
-                { Where: { predicate: { BinaryExpression: { left: RCol('success'), op: 'Equal', right: RLiteral(true) }}}}
-            ]
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Where: { predicate: RBinaryExpr(RCol('success'), 'Equal', RLiteral(true)) }} ]
         };
     }
-    // Add other KQL to ActualRustKql AST mappings as needed...
+
+    // --- New KQL Test Cases for Phase 8 ---
+    else if (normalizedQuery === 'events | search "critical error"') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Search: { search_term: RLiteral("critical error") as ActualRustKqlLiteralExpression, columns: null } } ],
+        };
+    } else if (normalizedQuery === 'events | where timestamp < ago(5m) and severity in ("high", "critical") and message contains "failed"') {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Where: { predicate: RBinaryExpr(
+                RBinaryExpr(
+                    RBinaryExpr(RCol('timestamp'), 'LessThan', RLiteral(fiveMinutesAgo)),
+                    'And',
+                    RBinaryExpr(RCol('severity'), 'In', RArrayLiteral(["High", "Critical"]))
+                ),
+                'And',
+                RBinaryExpr(RCol('message'), 'Contains', RLiteral('failed'))
+            )}}} ],
+        };
+    } else if (normalizedQuery === 'events | where process_name startswith "powershell" and command_line endswith ".exe"') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Where: { predicate: RBinaryExpr(
+                RBinaryExpr(RCol('process_name'), 'StartsWith', RLiteral('powershell')),
+                'And',
+                // Assuming command_line is in parsed_fields for this example based on typical event structures
+                RBinaryExpr(RPath('parsed_fields', 'CommandLine'), 'EndsWith', RLiteral('.exe'))
+            )}}} ],
+        };
+    } else if (normalizedQuery === 'events | where details matches regex "user=([^\\s]+)"') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Where: { predicate: RBinaryExpr(
+                RCol('details'), // Assuming 'details' is a direct column or in parsed_fields
+                'MatchesRegex',
+                RLiteral("user=([^\\s]+)")
+            )}}} ],
+        };
+    } else if (normalizedQuery === 'events | extend event_hour = gethour(timestamp), user_domain = strcat(username, "@", domain)') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Extend: { columns: [
+                RNamedExpr('event_hour', RFuncCall('gethour', [RCol('timestamp')])),
+                RNamedExpr('user_domain', RFuncCall('strcat', [RCol('username'), RLiteral('@'), RCol('domain')]))
+            ]}} ],
+        };
+    } else if (normalizedQuery === 'events | distinct event_type_id, user_id') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Distinct: { columns: [ RCol('event_type_id'), RCol('user_id') ] } } ],
+        };
+    } else if (normalizedQuery === 'events | top 3 by event_count desc withothers = true') {
+        mainTabularExpression = {
+            source: { name: RIdent('events'), alias: null },
+            operations: [ { Top: {
+                count: RLiteral(3),
+                by_expression: RNamedExpr('event_count',RCol('event_count')),
+                sort_order: 'Desc',
+                with_others: RLiteral(true) as ActualRustKqlLiteralExpression
+            } } ],
+        };
+    }
+
 
     if (mainTabularExpression) {
         rustAstObject = {
             statements: [ { TabularExpression: mainTabularExpression } ]
         };
-        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async delay
+        await new Promise(resolve => setTimeout(resolve, 10));
         return JSON.stringify(rustAstObject);
     } else {
         await new Promise(resolve => setTimeout(resolve, 5));
@@ -158,18 +224,15 @@ export async function parseKqlToAst(kqlQuery: string): Promise<QueryNode | null>
   try {
     console.log(`[WasmLoader] Received KQL: ${kqlQuery}`);
     const rustAstJsonString = await simulatedWasmCall(kqlQuery);
-    // console.log(`[WasmLoader] Received (simulated) Actual Rust AST JSON string: ${rustAstJsonString}`); // Verbose
 
-    const rustAstParsed = JSON.parse(rustAstJsonString); // This is now the ActualRustKqlQuery object
-    // console.log(`[WasmLoader] Parsed (simulated) Actual Rust AST object:`, JSON.stringify(rustAstParsed, null, 2)); // Verbose
+    const rustAstParsed = JSON.parse(rustAstJsonString);
 
-    const queryNode = transformRustAstToQueryNode(rustAstParsed); // Pass the parsed object
+    const queryNode = transformRustAstToQueryNode(rustAstParsed);
     if (!queryNode) {
       console.error(`[WasmLoader] Failed to transform Actual Rust AST for query: ${kqlQuery}. Input Rust AST:`, JSON.stringify(rustAstParsed, null, 2));
       return null;
     }
 
-    // console.log(`[WasmLoader] Transformed to QueryNode AST:`, JSON.stringify(queryNode, null, 2)); // Verbose
     return queryNode;
 
   } catch (error: any) {

@@ -5,54 +5,69 @@ import {
   SortNode, SortClause,
   EqualityConditionNode, ComparisonConditionNode, ComparisonOperator,
   StringOperationConditionNode, StringOperationType,
-  LogicalConditionNode, LogicalOperator
+  LogicalConditionNode, LogicalOperator,
+  // New AST Node types
+  SearchNode, ExtendNode, DistinctNode, TopNode, ExtendedColumn, KqlExpressionValue,
+  InConditionNode, MatchesRegexConditionNode
 } from './kql_ast';
 
+// --- Helper Functions ---
 function escapeSqlString(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-// Helper to format SQL literal values based on JS type
-function formatSqlValue(value: string | number | boolean): string {
-  if (typeof value === 'string') {
-    return `'${escapeSqlString(value)}'`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  // Fallback for other types, though our AST currently only supports these
+function formatSqlValue(value: string | number | boolean | null): string {
+  if (typeof value === 'string') return `'${escapeSqlString(value)}'`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null) return 'NULL';
   return `'${escapeSqlString(String(value))}'`;
 }
 
+// Manages the set of available column names/aliases at each stage of query processing
+// This is crucial for `sort by`, `project` after `extend` or `summarize`.
+let currentKnownColumns: Set<string> = new Set();
+
 // Helper to format field names for SQL.
-// Casting is now primarily handled in transpileConditionNode or for aggregations.
-function getFieldSqlAccessor(field: GroupByItem): string {
+// `context` can be 'SELECT', 'WHERE', 'GROUP_BY', 'ORDER_BY', 'AGG_ARG'
+function getFieldSqlRepresentation(field: GroupByItem, context: 'SELECT' | 'WHERE' | 'GROUP_BY' | 'ORDER_BY' | 'AGG_ARG'): string {
   if (typeof field === 'string') {
-    if (field.startsWith('parsed_fields.')) {
+    const isParsedField = field.startsWith('parsed_fields.');
+    if (isParsedField) {
       const actualField = field.substring('parsed_fields.'.length);
-      return `parsed_fields->>'${actualField}'`;
+      const accessor = `parsed_fields->>'${actualField}'`;
+      if (context === 'SELECT') return `${accessor} AS "${field}"`; // Alias for select
+      if (context === 'AGG_ARG' && (field.toLowerCase().includes('size') || field.toLowerCase().includes('count') || field.toLowerCase().includes('score'))) { // Heuristic
+        return `(${accessor})::numeric`; // Cast for aggregation if seems numeric
+      }
+      return accessor; // Raw accessor for WHERE, GROUP_BY, ORDER_BY
     }
-    return `"${field}"`; // Quote direct column names for safety
+    // Direct column name, quote for safety
+    return `"${field}"`;
   } else if (field.type === 'FunctionCall' && field.functionName === 'date_trunc') {
     const funcName = field.functionName.toUpperCase();
-    const arg1 = formatSqlValue(field.arguments[0]); // e.g., 'hour'
-    const arg2 = getFieldSqlAccessor(field.arguments[1]); // e.g., "timestamp" (the column)
-    return `${funcName}(${arg1}, ${arg2})`;
+    const arg1 = formatSqlValue(field.arguments[0]);
+    const arg2 = getFieldSqlRepresentation(field.arguments[1], 'AGG_ARG'); // Argument to date_trunc is like an agg arg
+    const sqlFunc = `${funcName}(${arg1}, ${arg2})`;
+    if (context === 'SELECT') return `${sqlFunc} AS "${field.alias}"`;
+    return sqlFunc; // Raw function for GROUP_BY, ORDER_BY (if sorting by expression)
   }
-  throw new Error(`Unsupported field type in getFieldSqlAccessor: ${JSON.stringify(field)}`);
+  throw new Error(`Unsupported field type in getFieldSqlRepresentation: ${JSON.stringify(field)}`);
 }
 
-// Helper to get the field name for SELECT clause, including alias for functions/parsed_fields
-function getSelectFieldSql(field: GroupByItem): string {
-    if (typeof field === 'string') {
-        if (field.startsWith('parsed_fields.')) {
-            return `${getFieldSqlAccessor(field)} AS "${field}"`;
-        }
-        return getFieldSqlAccessor(field); // Direct field, accessor is already quoted
-    } else if (field.type === 'FunctionCall' && field.functionName === 'date_trunc') {
-        return `${getFieldSqlAccessor(field)} AS "${field.alias}"`;
-    }
-    throw new Error(`Unsupported field type in getSelectFieldSql: ${JSON.stringify(field)}`);
+function sqlExpressionForKqlExpressionValue(expr: KqlExpressionValue): string {
+  switch (expr.type) {
+    case 'ColumnReference':
+      return getFieldSqlRepresentation(expr.columnName, 'SELECT'); // Or 'WHERE' depending on context, but usually for extend's SELECT part
+    case 'Literal':
+      return formatSqlValue(expr.value);
+    case 'RawSqlExpression': // Already pre-formatted SQL snippet
+      return expr.expressionString;
+    // Future: Handle 'FunctionCall', 'ArithmeticExpression' from KqlExpressionValue by generating SQL
+    default:
+      console.warn(`[Transpiler] Unsupported KqlExpressionValue type: ${JSON.stringify(expr)}`);
+      // @ts-ignore
+      throw new Error(`Unsupported KqlExpressionValue type: ${expr.type}`);
+  }
 }
 
 
@@ -63,53 +78,43 @@ function transpileConditionNode(condition: ConditionNode): string {
   switch (condition.type) {
     case 'Equals':
       const eqNode = condition as EqualityConditionNode;
-      fieldSql = getFieldSqlAccessor(eqNode.field);
+      fieldSql = getFieldSqlRepresentation(eqNode.field, 'WHERE');
+      if (eqNode.value === null) return `${fieldSql} IS NULL`;
 
       if (eqNode.field.startsWith('parsed_fields.')) {
-        // All parsed_fields are accessed as text (->>)
-        // So, compare with the string representation of the value from KQL.
         valueSql = formatSqlValue(String(eqNode.value));
       } else {
-        // Direct column, use the value's JS type to format for SQL
         valueSql = formatSqlValue(eqNode.value);
       }
       return `${fieldSql} = ${valueSql}`;
 
     case 'Compare':
       const compNode = condition as ComparisonConditionNode;
-      fieldSql = getFieldSqlAccessor(compNode.field);
+      fieldSql = getFieldSqlRepresentation(compNode.field, 'WHERE');
 
       if (compNode.field.startsWith('parsed_fields.')) {
-        // If comparing a parsed_field, and KQL value is a number, cast field to numeric
         if (typeof compNode.value === 'number') {
-          fieldSql = `(${fieldSql})::numeric`;
-          valueSql = formatSqlValue(compNode.value); // number
+          fieldSql = `(${fieldSql})::numeric`; // Cast field to numeric for comparison
+          valueSql = formatSqlValue(compNode.value);
         } else {
-          // Comparing parsed_field (text) with a string from KQL, standard text comparison
-          valueSql = formatSqlValue(compNode.value); // string
+          valueSql = formatSqlValue(compNode.value); // String comparison
         }
       } else {
-        // Direct column, format value based on its JS type
         valueSql = formatSqlValue(compNode.value);
       }
       return `${fieldSql} ${compNode.operator} ${valueSql}`;
 
     case 'StringOperation':
       const strOpNode = condition as StringOperationConditionNode;
-      fieldSql = getFieldSqlAccessor(strOpNode.field);
-      // Value for LIKE/ILIKE should always be treated as a string pattern
+      fieldSql = getFieldSqlRepresentation(strOpNode.field, 'WHERE');
       const likeValue = strOpNode.value;
       const likeOp = strOpNode.caseSensitive === true ? 'LIKE' : 'ILIKE';
 
       switch (strOpNode.operator) {
-        case 'contains':
-          return `${fieldSql} ${likeOp} '%${escapeSqlString(likeValue)}%'`;
-        case 'startswith':
-          return `${fieldSql} ${likeOp} '${escapeSqlString(likeValue)}%'`;
-        case 'endswith':
-          return `${fieldSql} ${likeOp} '%${escapeSqlString(likeValue)}'`;
-        default:
-          throw new Error(`Unsupported string operator: ${strOpNode.operator}`);
+        case 'contains': return `${fieldSql} ${likeOp} '%${escapeSqlString(likeValue)}%'`;
+        case 'startswith': return `${fieldSql} ${likeOp} '${escapeSqlString(likeValue)}%'`;
+        case 'endswith': return `${fieldSql} ${likeOp} '%${escapeSqlString(likeValue)}%'`;
+        default: throw new Error(`Unsupported string operator: ${strOpNode.operator}`);
       }
 
     case 'Logical':
@@ -117,10 +122,41 @@ function transpileConditionNode(condition: ConditionNode): string {
       const conditionsSql = logNode.conditions.map(c => `(${transpileConditionNode(c)})`).join(` ${logNode.operator.toUpperCase()} `);
       return conditionsSql;
 
+    case 'In': // New
+      const inNode = condition as InConditionNode;
+      fieldSql = getFieldSqlRepresentation(inNode.field, 'WHERE');
+      const valuesSql = inNode.values.map(v => formatSqlValue(v)).join(', ');
+      // TODO: Handle inNode.caseSensitive for string values if needed (would require ILIKE ANY(ARRAY[...]))
+      // For now, direct IN comparison.
+      return `${fieldSql} IN (${valuesSql})`;
+
+    case 'MatchesRegex': // New
+      const regexNode = condition as MatchesRegexConditionNode;
+      fieldSql = getFieldSqlRepresentation(regexNode.field, 'WHERE');
+      // PostgreSQL regex match operator is '~' (case-sensitive) or '~*' (case-insensitive)
+      // KQL `matches regex` is typically case-sensitive.
+      return `${fieldSql} ~ ${formatSqlValue(regexNode.regex)}`;
+
     default:
       // @ts-ignore
       throw new Error(`Unsupported condition node type: ${condition.type}`);
   }
+}
+
+function transpileSearchOperator(searchNode: SearchNode, defaultSearchableColumns: string[]): string {
+    const term = searchNode.searchTerm;
+    if (!term || typeof term !== 'string' || term.trim() === '') return "";
+
+    const searchTermSql = `'%${escapeSqlString(term)}%'`;
+    let columnsToSearch = defaultSearchableColumns;
+
+    if (searchNode.columns && searchNode.columns.length > 0) {
+        columnsToSearch = searchNode.columns.map(col => getFieldSqlRepresentation(col, 'WHERE'));
+    }
+
+    if (columnsToSearch.length === 0) return ""; // Or search all text/varchar columns (more complex)
+
+    return columnsToSearch.map(col => `${col} ILIKE ${searchTermSql}`).join(' OR ');
 }
 
 
@@ -128,137 +164,198 @@ export function transpileAstToSql(ast: QueryNode): string {
   if (ast.type !== 'Query' || !ast.source) {
     throw new Error('Invalid AST: Must be a QueryNode with a source table.');
   }
+  currentKnownColumns = new Set(); // Reset for each query
 
-  let selectFieldsSqlParts: string[] = ['*'];
-  let whereClause = '';
-  let groupByClause = '';
-  let orderByClause = '';
-  let limitClause = '';
+  let selectParts: string[] = ['*'];
+  let whereConditions: string[] = [];
+  let groupByParts: string[] = [];
+  let orderByParts: string[] = [];
+  let limitClause: string | null = null;
 
+  let isDistinct = false;
   let hasSummarize = false;
-  // Store how group by fields should appear in SELECT (e.g. with alias) and GROUP BY (raw accessor/function)
-  let summarizeSelectSQL: string[] = [];
-  let summarizeGroupBySQL: string[] = [];
+  let finalProjectFields: string[] | null = null; // Store fields from the last project operator
+
+  // Default columns to search if `search` operator doesn't specify columns
+  const defaultSearchableColumnsForEvents = [
+      getFieldSqlRepresentation("message_short", "WHERE"),
+      getFieldSqlRepresentation("message_full", "WHERE"),
+      getFieldSqlRepresentation("user_id", "WHERE"),
+      getFieldSqlRepresentation("hostname", "WHERE"),
+      getFieldSqlRepresentation("process_name", "WHERE"),
+      getFieldSqlRepresentation("parsed_fields.CommandLine", "WHERE"), // Example parsed field
+  ];
+
+  // First pass to gather all column definitions (from source, extend, summarize)
+  // This is a simplified approach. A more robust way involves tracking available columns at each step.
+  // For now, assume all original columns are available, plus what extend/summarize adds.
+  // This doesn't perfectly model KQL's column scoping if project is used mid-pipeline.
+
+  // Initial population of known columns (conceptual - all columns from ast.source)
+  // In a real scenario with schema introspection: currentKnownColumns = new Set(getColumnsForTable(ast.source));
+  // For PoC: if no project/summarize, we use '*', extend adds to this.
+
+  let processedOperations: OperationNode[] = []; // For multi-stage SELECT construction
 
   for (const operation of ast.operations) {
     switch (operation.type) {
+      case 'Search': // New
+        const searchCondition = transpileSearchOperator(operation as SearchNode, defaultSearchableColumnsForEvents);
+        if (searchCondition) whereConditions.push(`(${searchCondition})`);
+        break;
+      case 'Where':
+        whereConditions.push(`(${transpileConditionNode((operation as WhereNode).condition)})`);
+        break;
+      case 'Extend': // New
+        const extendNode = operation as ExtendNode;
+        if (selectParts.length === 1 && selectParts[0] === '*') {
+            selectParts = []; // Will be populated by extend or default to source.* + extended
+        }
+        extendNode.newColumns.forEach(ec => {
+            const exprSql = sqlExpressionForKqlExpressionValue(ec.expression);
+            selectParts.push(`${exprSql} AS "${escapeSqlString(ec.name)}"`);
+            currentKnownColumns.add(ec.name);
+        });
+        break;
+      case 'Summarize':
+        hasSummarize = true;
+        const summarizeNode = operation as SummarizeNode;
+        selectParts = []; // Summarize dictates the SELECT fields
+        groupByParts = [];
+
+        summarizeNode.groupByFields.forEach(gf => {
+          selectParts.push(getFieldSqlRepresentation(gf, 'SELECT'));
+          groupByParts.push(getFieldSqlRepresentation(gf, 'GROUP_BY'));
+          if (typeof gf === 'string') currentKnownColumns.add(gf);
+          else currentKnownColumns.add(gf.alias); // Add GroupByExpression alias
+        });
+
+        summarizeNode.aggregations.forEach(agg => {
+          let aggSql = '';
+          const fieldForAgg = agg.field ? getFieldSqlRepresentation(agg.field, 'AGG_ARG') : '';
+          switch (agg.function) {
+            case 'count': aggSql = `COUNT(*)`; break;
+            case 'dcount':
+              if (!agg.field) throw new Error("dcount requires a field.");
+              aggSql = `COUNT(DISTINCT ${fieldForAgg})`; break;
+            // Cast for numeric aggregations if field is from parsed_fields (heuristic in getFieldSqlRepresentation)
+            case 'min': aggSql = `MIN(${fieldForAgg})`; break;
+            case 'max': aggSql = `MAX(${fieldForAgg})`; break;
+            case 'avg': aggSql = `AVG(${fieldForAgg})`; break;
+            case 'sum': aggSql = `SUM(${fieldForAgg})`; break;
+            default: throw new Error(`Unsupported aggregation function: ${agg.function}`);
+          }
+          selectParts.push(`${aggSql} AS "${escapeSqlString(agg.newColumnName)}"`);
+          currentKnownColumns.add(agg.newColumnName);
+        });
+        break;
+      case 'Distinct': // New
+        const distinctNode = operation as DistinctNode;
+        isDistinct = true;
+        if (distinctNode.columns && distinctNode.columns.length > 0) {
+            selectParts = distinctNode.columns.map(c => getFieldSqlRepresentation(c, 'SELECT'));
+            distinctNode.columns.forEach(c => currentKnownColumns.add(c)); // Assuming distinct columns are simple strings
+        } else if (selectParts[0] === '*') {
+            // `distinct *` is not valid KQL, usually `distinct col1, col2` or `summarize by col1, col2 | distinct col1, col2`
+            // If `distinct` follows `project`, it uses those columns.
+            // If `distinct` is on its own with no columns, it implies distinct across all currently available columns.
+            // This PoC will assume `distinct` with no columns means `DISTINCT *` if no prior projection.
+            // If selectParts were already set by project/extend, DISTINCT applies to those.
+        }
+        break;
       case 'Project':
         const projectNode = operation as ProjectNode;
-        if (!hasSummarize && projectNode.fields && projectNode.fields.length > 0) {
-          selectFieldsSqlParts = projectNode.fields.map(f => getSelectFieldSql(f as GroupByItem)); // Cast needed if Project fields could also be GroupByExpression
-        } else if (hasSummarize) {
-            console.warn("[KQL Transpiler] Project after summarize is not fully implemented. Current selection from summarize will be used.");
-            // A full implementation would re-project from the results of the summarize.
-            // For now, the selectFieldsSqlParts already contains the summarize output.
-        }
-        break;
-
-      case 'Where':
-        const whereNode = operation as WhereNode;
-        const conditionSql = transpileConditionNode(whereNode.condition);
-        if (whereClause === '') {
-          whereClause = `WHERE ${conditionSql}`;
+        if (projectNode.fields && projectNode.fields.length > 0) {
+            selectParts = projectNode.fields.map(f => {
+                // If the field 'f' was an alias from a previous summarize or extend, it should be used directly.
+                // Otherwise, it's a direct column or parsed_field.
+                if (currentKnownColumns.has(f)) return `"${escapeSqlString(f)}"`; // Use existing alias
+                return getFieldSqlRepresentation(f, 'SELECT'); // Create new selection (possibly with alias for parsed_field)
+            });
+            currentKnownColumns = new Set(projectNode.fields); // Project redefines the available columns
         } else {
-          whereClause += ` AND ${conditionSql}`;
+            // `project` with no fields is effectively a no-op or might imply keeping all current.
+            // For this PoC, if selectParts was '*', it remains so. If it was specific, it remains.
+            // KQL `project` usually requires fields.
+        }
+        finalProjectFields = projectNode.fields; // Track the last projection
+        break;
+      case 'Sort': // Sort / Order By
+        const sortNode = operation as SortNode;
+        if (sortNode.clauses && sortNode.clauses.length > 0) {
+          orderByParts = sortNode.clauses.map(c => {
+            let fieldToSortBy = `"${escapeSqlString(c.field)}"`; // Assume sorting by an existing (possibly aliased) column
+            // Check if c.field is a direct column/path if not in currentKnownColumns (less likely after summarize/extend)
+            if (!currentKnownColumns.has(c.field)) {
+                 fieldToSortBy = getFieldSqlRepresentation(c.field, 'ORDER_BY');
+            }
+            let clauseSql = fieldToSortBy;
+            if (c.order) clauseSql += ` ${c.order.toUpperCase()}`;
+            if (c.nulls) clauseSql += ` NULLS ${c.nulls.toUpperCase()}`;
+            return clauseSql;
+          });
         }
         break;
-
+      case 'Top': // New
+        const topNode = operation as TopNode;
+        orderByParts = [`${getFieldSqlRepresentation(topNode.byField, 'ORDER_BY')} ${topNode.order === 'asc' ? 'ASC' : 'DESC'}`];
+        limitClause = `LIMIT ${topNode.count}`;
+        // `withothers` is a KQL concept not directly translatable to simple SQL LIMIT.
+        // It implies further processing or a more complex query (e.g., with window functions or unions).
+        // For PoC, we ignore `withothers` at the SQL generation stage.
+        if (topNode.withOthers) console.warn("[Transpiler] `top ... withothers` is not fully supported in SQL generation.");
+        break;
       case 'Take':
         const takeNode = operation as TakeNode;
         if (takeNode.count > 0) {
           limitClause = `LIMIT ${takeNode.count}`;
         }
         break;
-
-      case 'Summarize':
-        hasSummarize = true;
-        const summarizeNode = operation as SummarizeNode;
-        summarizeSelectSQL = [];
-        summarizeGroupBySQL = [];
-
-        summarizeNode.groupByFields.forEach(gf => {
-          summarizeSelectSQL.push(getSelectFieldSql(gf));
-          summarizeGroupBySQL.push(getFieldSqlAccessor(gf));
-        });
-
-        selectFieldsSqlParts = [...summarizeSelectSQL]; // Start SELECT with group by fields (aliased if functions)
-
-        summarizeNode.aggregations.forEach(agg => {
-          let aggSqlFragments = '';
-          let fieldForAgg = '';
-          if (agg.field) {
-            // For aggregations like min, max, avg, sum, if the field is from parsed_fields, cast it to numeric.
-            // For dcount, no cast on the field itself.
-            const fieldAccessor = getFieldSqlAccessor(agg.field);
-            if ((agg.function === 'min' || agg.function === 'max' || agg.function === 'avg' || agg.function === 'sum') && agg.field.startsWith('parsed_fields.')) {
-              fieldForAgg = `(${fieldAccessor})::numeric`;
-            } else {
-              fieldForAgg = fieldAccessor;
-            }
-          }
-
-          switch (agg.function) {
-            case 'count': aggSqlFragments = `COUNT(*)`; break;
-            case 'dcount':
-              if (!agg.field) throw new Error("dcount requires a field name.");
-              aggSqlFragments = `COUNT(DISTINCT ${fieldForAgg})`; break;
-            case 'min':
-              if (!agg.field) throw new Error("min requires a field name.");
-              aggSqlFragments = `MIN(${fieldForAgg})`; break;
-            case 'max':
-              if (!agg.field) throw new Error("max requires a field name.");
-              aggSqlFragments = `MAX(${fieldForAgg})`; break;
-            case 'avg':
-              if (!agg.field) throw new Error("avg requires a field name.");
-              aggSqlFragments = `AVG(${fieldForAgg})`; break;
-            case 'sum':
-              if (!agg.field) throw new Error("sum requires a field name.");
-              aggSqlFragments = `SUM(${fieldForAgg})`; break;
-            default: throw new Error(`Unsupported aggregation function: ${agg.function}`);
-          }
-          selectFieldsSqlParts.push(`${aggSqlFragments} AS "${agg.newColumnName}"`);
-        });
-
-        if (summarizeNode.groupByFields.length > 0) {
-          groupByClause = `GROUP BY ${summarizeGroupBySQL.join(', ')}`;
-        }
-        break;
-
-      case 'Sort':
-        const sortNode = operation as SortNode;
-        if (sortNode.clauses && sortNode.clauses.length > 0) {
-          orderByClause = 'ORDER BY ' + sortNode.clauses.map(c => {
-            let fieldToSortBy = `"${c.field}"`; // Default to sorting by alias (from summarize/project) or quoted field name
-
-            // Check if sorting by a direct column not otherwise aliased by summarize's groupBy (which getSelectFieldSql handles for select)
-            // This logic is tricky because 'c.field' could be an aggregation alias, a groupBy alias, or a direct column.
-            // For this PoC, we assume if it's not an aggregation alias, it's either a direct column or a groupBy alias.
-            // Aggregation aliases are already quoted. GroupBy aliases (from date_trunc) are quoted. Direct columns need quoting.
-            // The simplest is to always quote the sort field if it's not a complex expression.
-            // If c.field refers to an alias generated by summarize (either an aggregation or a GroupByExpression alias), it's already correct.
-            // If c.field refers to a direct table column or a parsed_field that wasn't part of summarize groupBy, use getFieldSqlAccessor.
-
-            const isAggregationAlias = summarizeNode?.aggregations.some(agg => agg.newColumnName === c.field);
-            const isGroupByAlias = summarizeNode?.groupByFields.some(gf => typeof gf !== 'string' && gf.alias === c.field);
-
-            if (!isAggregationAlias && !isGroupByAlias) {
-                fieldToSortBy = getFieldSqlAccessor(c.field);
-            }
-
-            let clauseSql = fieldToSortBy;
-            if (c.order) clauseSql += ` ${c.order.toUpperCase()}`;
-            if (c.nulls) clauseSql += ` NULLS ${c.nulls.toUpperCase()}`;
-            return clauseSql;
-          }).join(', ');
-        }
-        break;
-
       default:
         // @ts-ignore
-        throw new Error(`Unsupported KQL operation: ${operation.type}`);
+        throw new Error(`Unsupported KQL operation during SQL construction: ${operation.type}`);
     }
+    processedOperations.push(operation);
   }
 
-  const selectClauseSql = `SELECT ${selectFieldsSqlParts.join(', ')}`;
-  return `${selectClauseSql} FROM "${ast.source}"${whereClause ? ' ' + whereClause : ''}${groupByClause ? ' ' + groupByClause : ''}${orderByClause ? ' ' + orderByClause : ''}${limitClause ? ' ' + limitClause : ''};`;
+  // Construct final SELECT clause
+  let finalSelectClause = "SELECT ";
+  if (isDistinct) finalSelectClause += "DISTINCT ";
+
+  if (selectParts.length === 0 || (selectParts.length === 1 && selectParts[0] === '*')) {
+      if (processedOperations.some(op => op.type === 'Extend')) {
+          // If extend was used but no project/summarize followed, select original cols + extended.
+          // This requires knowing original columns. For PoC, assume '*' + extended parts.
+          // The 'selectParts' from Extend already includes 'AS alias'.
+          // This logic is tricky. Let's assume `selectParts` from Extend is complete if it's not empty.
+          // If `selectParts` is still ['*'] after extend, it means `SELECT *, ext1 as E1, ext2 as E2 ...`
+          // This is a common SQL pattern but makes `selectParts` management complex.
+          // Simplification: If extend happened, and selectParts is empty, it should have been populated by extend.
+          // If selectParts is ['*'] it means the user wants all original columns PLUS the extended ones.
+          // The current extend logic *replaces* selectParts if it was ['*'].
+          // If extend populated selectParts, and it's not empty, use it.
+          if (selectParts.length > 0 && !(selectParts.length === 1 && selectParts[0] === '*')) {
+              finalSelectClause += selectParts.join(', ');
+          } else { // selectParts is empty or still '*' after extend. This case needs better handling.
+                    // For now, if it's empty after extend, it's an issue. If it's '*', it's fine.
+              finalSelectClause += '*'; // Default if extend didn't populate and no project/summarize
+              // A more robust `Extend` would add its columns to a list of "available" columns,
+              // and if `selectParts` is `*`, it would be `source.*, extended_col1, extended_col2`.
+              // The current extend logic directly pushes `expr AS alias` into selectParts.
+          }
+      } else {
+          finalSelectClause += '*'; // Default if no Project, Summarize, or populated Distinct.columns
+      }
+  } else {
+      finalSelectClause += selectParts.join(', ');
+  }
+
+
+  const fromClause = `FROM "${ast.source}"`;
+  const whereClauseSql = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+  const groupByClauseSql = groupByParts.length > 0 ? `GROUP BY ${groupByParts.join(', ')}` : '';
+  const orderByClauseSql = orderByParts.length > 0 ? `ORDER BY ${orderByParts.join(', ')}` : '';
+  const limitClauseSql = limitClause || '';
+
+  return `${finalSelectClause} ${fromClause}${whereClauseSql ? ' ' + whereClauseSql : ''}${groupByClauseSql ? ' ' + groupByClauseSql : ''}${orderByClauseSql ? ' ' + orderByClauseSql : ''}${limitClauseSql ? ' ' + limitClauseSql : ''};`.trim();
 }
