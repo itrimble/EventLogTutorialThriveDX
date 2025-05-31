@@ -2,38 +2,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { LogEntry } from '@/lib/types/log_entry'; 
-import EventDetailsModal from './EventDetailsModal'; 
-
-const ITEMS_PER_PAGE = 15;
-
-// Define a specific sort key type for LogEntry fields that are sortable
-type LogEntrySortKey = 'timestamp' | 'source_identifier' | 'log_file';
-type SortOrder = 'asc' | 'desc';
-
-interface EventsTableProps {
-  logEntries: LogEntry[];
-  isLoading: boolean;
-  error: string | null;
-  // onOpenModal: (logEntry: LogEntry) => void; // Optional: if modal control is lifted
-}
-
-const EventsTable: React.FC<EventsTableProps> = ({ 
-  logEntries, 
-  isLoading, 
-  error 
-  // onOpenModal 
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedEvent, setSelectedEvent] = useState<LogEntry | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Default sort by timestamp descending
-  const [sortKey, setSortKey] = useState<LogEntrySortKey>('timestamp');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-
-import React, { useState, useMemo, useEffect } from 'react';
-import type { LogEntry } from '@/lib/types/log_entry';
 import EventDetailsModal from './EventDetailsModal';
 import useDebounce from '@/hooks/useDebounce'; // Import the hook
 import { XCircle, Search as SearchIcon, FileText, FileJson } from 'lucide-react'; // Added icons
@@ -59,8 +27,6 @@ const EventsTable: React.FC<EventsTableProps> = ({
   // onOpenModal 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search term by 300ms
-
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEvent, setSelectedEvent] = useState<LogEntry | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,6 +34,8 @@ const EventsTable: React.FC<EventsTableProps> = ({
   // Default sort by timestamp descending
   const [sortKey, setSortKey] = useState<LogEntrySortKey>('timestamp');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search term by 300ms
 
   // Reset current page when logEntries or debouncedSearchTerm change
   useEffect(() => {

@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "eventlog-tutorial-thrivedx",
   "version": "0.1.0",
   "description": "Windows Event Log analysis and SIEM query generation tutorial for cybersecurity education",
@@ -9,11 +8,6 @@
     "type": "git",
     "url": "https://github.com/itrimble/EventLogTutorialThriveDX"
   },
-=======
-  "name": "eventlog-analyzer",
-  "version": "0.1.0",
-  "private": true,
->>>>>>> add-claude-github-actions-1748383502583
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -21,7 +15,11 @@
     "lint": "next lint"
   },
   "dependencies": {
-<<<<<<< HEAD
+    "@heroicons/react": "^2.2.0",
+    "@nivo/chord": "^0.99.0",
+    "@nivo/core": "^0.99.0",
+    "@nivo/heatmap": "^0.99.0",
+    "@nivo/scatterplot": "^0.99.0",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
@@ -30,25 +28,15 @@
     "@supabase/supabase-js": "^2.49.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.511.0",
-    "next": "15.3.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.3.0"
-=======
-    "@heroicons/react": "^2.2.0",
-    "@nivo/chord": "^0.99.0",
-    "@nivo/core": "^0.99.0",
-    "@nivo/heatmap": "^0.99.0",
-    "@nivo/scatterplot": "^0.99.0",
     "echarts": "^5.6.0",
     "echarts-for-react": "^3.0.2",
+    "lucide-react": "^0.511.0",
     "next": "15.3.2",
     "pg": "^8.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.3"
->>>>>>> add-claude-github-actions-1748383502583
+    "recharts": "^2.15.3",
+    "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

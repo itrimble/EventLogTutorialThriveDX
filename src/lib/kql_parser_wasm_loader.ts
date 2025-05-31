@@ -222,7 +222,7 @@ async function simulatedWasmCall(kqlQuery: string): Promise<string> {
                 ),
                 'And',
                 RBinaryExpr(RCol('message'), 'Contains', RLiteral('failed'))
-            )}}} ],
+            ) } } ],
         };
     }
     else if (normalizedQuery === 'events | where process_name startswith "powershell" and command_line endswith ".exe"') {
@@ -232,7 +232,7 @@ async function simulatedWasmCall(kqlQuery: string): Promise<string> {
                 RBinaryExpr(RCol('process_name'), 'StartsWith', RLiteral('powershell')),
                 'And',
                 RBinaryExpr(RPath('parsed_fields', 'CommandLine'), 'EndsWith', RLiteral('.exe'))
-            )}}} ],
+            ) } } ],
         };
     }
     else if (normalizedQuery === 'events | where details matches regex "user=([^\\s]+)"') {
@@ -242,7 +242,7 @@ async function simulatedWasmCall(kqlQuery: string): Promise<string> {
                 RCol('details'),
                 'MatchesRegex',
                 RLiteral("user=([^\\s]+)")
-            )}}} ],
+            ) } } ],
         };
     }
     else if (normalizedQuery === 'events | extend event_hour = gethour(timestamp), user_domain = strcat(username, "@", domain)') {

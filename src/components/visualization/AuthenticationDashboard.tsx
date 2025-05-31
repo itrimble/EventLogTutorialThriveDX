@@ -3,8 +3,8 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ReactECharts from 'echarts-for-react';
 import { ResponsiveHeatMap } from '@nivo/heatmap';
-import 'echarts/lib/chart/map';
-import 'echarts/map/js/world';
+// import 'echarts/lib/chart/map'; // Commented out - map module not available in current echarts version
+// import 'echarts/map/js/world'; // Commented out - map module not available in current echarts version
 
 
 // Define an interface for the expected API response structure
