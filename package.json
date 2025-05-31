@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "eventlog-tutorial-thrivedx",
   "version": "0.1.0",
   "description": "Windows Event Log analysis and SIEM query generation tutorial for cybersecurity education",
@@ -8,6 +9,11 @@
     "type": "git",
     "url": "https://github.com/itrimble/EventLogTutorialThriveDX"
   },
+=======
+  "name": "eventlog-analyzer",
+  "version": "0.1.0",
+  "private": true,
+>>>>>>> add-claude-github-actions-1748383502583
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -15,6 +21,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
@@ -28,6 +35,13 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.3.0"
+=======
+    "@heroicons/react": "^2.2.0",
+    "next": "15.3.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.3"
+>>>>>>> add-claude-github-actions-1748383502583
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
