@@ -1,103 +1,235 @@
-import Image from "next/image";
+'use client'
+
+import { useState } from 'react'
+import { EventMapping } from '@/data/eventMappings'
+import { EventSearch } from '@/components/EventSearch'
+import { SIEMQueryGenerator } from '@/components/SIEMQueryGenerator'
+import { Shield, Database, Search, Code } from 'lucide-react'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedEvents, setSelectedEvents] = useState<EventMapping[]>([])
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const handleEventSelect = (event: EventMapping) => {
+    setSelectedEvents(prev => {
+      const isAlreadySelected = prev.some(selected => selected.eventId === event.eventId)
+      
+      if (isAlreadySelected) {
+        return prev.filter(selected => selected.eventId !== event.eventId)
+      } else {
+        return [...prev, event]
+      }
+    })
+  }
+
+  const handleClearSelection = () => {
+    setSelectedEvents([])
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <Shield className="text-blue-600" size={32} />
+                <h1 className="text-2xl font-bold text-gray-900">
+                  EventLog Tutorial
+                </h1>
+              </div>
+              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                ThriveDX
+              </span>
+            </div>
+            
+            <nav className="flex items-center space-x-6 text-sm">
+              <a 
+                href="#search" 
+                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                <Search size={16} />
+                <span>Search Events</span>
+              </a>
+              <a 
+                href="#generator" 
+                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                <Code size={16} />
+                <span>Query Generator</span>
+              </a>
+              <a 
+                href="https://attack.mitre.org" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                <Database size={16} />
+                <span>MITRE ATT&amp;CK</span>
+              </a>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold mb-4">
+            Windows Event Log Analysis &amp; SIEM Query Generation
+          </h2>
+          <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-8">
+            Learn cybersecurity monitoring by exploring Windows Event IDs mapped to MITRE ATT&amp;CK 
+            techniques and generating targeted SIEM queries for Splunk, Sentinel, ELK, and Logstash.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            <div className="text-center">
+              <Search className="mx-auto mb-2" size={32} />
+              <h3 className="font-semibold mb-1">Search Event IDs</h3>
+              <p className="text-sm text-blue-100">Find relevant events by attack type</p>
+            </div>
+            <div className="text-center">
+              <Shield className="mx-auto mb-2" size={32} />
+              <h3 className="font-semibold mb-1">MITRE Mapping</h3>
+              <p className="text-sm text-blue-100">ATT&amp;CK technique correlation</p>
+            </div>
+            <div className="text-center">
+              <Code className="mx-auto mb-2" size={32} />
+              <h3 className="font-semibold mb-1">Query Generation</h3>
+              <p className="text-sm text-blue-100">Multi-platform SIEM queries</p>
+            </div>
+            <div className="text-center">
+              <Database className="mx-auto mb-2" size={32} />
+              <h3 className="font-semibold mb-1">Real-time Learning</h3>
+              <p className="text-sm text-blue-100">Hands-on cybersecurity education</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Event Search Section */}
+          <div id="search" className="lg:col-span-2 space-y-6">
+            <EventSearch 
+              onEventSelect={handleEventSelect}
+              selectedEvents={selectedEvents}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+
+          {/* SIEM Query Generator Section */}
+          <div id="generator" className="lg:col-span-1">
+            <div className="sticky top-8">
+              <SIEMQueryGenerator 
+                selectedEvents={selectedEvents}
+                onClearSelection={handleClearSelection}
+              />
+            </div>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Educational Resources Section */}
+      <section className="bg-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Educational Resources
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Enhance your cybersecurity knowledge with these essential resources for Windows event log analysis and threat detection.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-3">Windows Event Documentation</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Official Microsoft documentation on Windows Event IDs and security audit events.
+              </p>
+              <a
+                href="https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/basic-security-audit-events"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                View Documentation →
+              </a>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-3">MITRE ATT&amp;CK Framework</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Comprehensive knowledge base of adversary tactics, techniques, and procedures.
+              </p>
+              <a
+                href="https://attack.mitre.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Explore Framework →
+              </a>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-3">SIEM Query References</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Platform-specific documentation for Splunk, Sentinel, ELK, and Logstash query languages.
+              </p>
+              <div className="space-y-1">
+                <a
+                  href="https://docs.splunk.com/Documentation/Splunk/latest/SearchTutorial/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  Splunk Search →
+                </a>
+                <a
+                  href="https://learn.microsoft.com/en-us/azure/sentinel/queries"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  Sentinel KQL →
+                </a>
+                <a
+                  href="https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  ELK DSL →
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center space-x-2 mb-4 md:mb-0">
+              <Shield size={24} />
+              <span className="font-semibold">EventLog Tutorial ThriveDX</span>
+            </div>
+            <div className="flex items-center space-x-6 text-sm text-gray-400">
+              <span>Built for cybersecurity education</span>
+              <a
+                href="mailto:itrimble@gmail.com"
+                className="hover:text-white transition-colors"
+              >
+                Contact: itrimble@gmail.com
+              </a>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
-  );
+  )
 }
