@@ -1,15 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ReactECharts from 'echarts-for-react';
+import { ResponsiveHeatMap } from '@nivo/heatmap';
+import 'echarts/lib/chart/map';
+import 'echarts/map/js/world';
+
 
 // Define an interface for the expected API response structure
+interface GeoDataItem {
+  name: string;
+  value: [number, number]; // [successful, failed]
+}
+
+interface HeatmapDataItem {
+  id: string; // Day of the week e.g., "Mon"
+  data: Array<{ x: string; y: number }>; // x: hour e.g., "00:00", y: count
+}
+
 interface AuthData {
   totalLogins: { successful: number; failed: number };
   orphanedAccountCount: number;
   authAttemptsOverTime: Array<{ time: string; windows: number; linux: number; macos: number }>;
   successVsFailureRates: Array<{ application: string; successful: number; failed: number }>;
-  loginAttemptsByCountry: Array<{ country: string; attempts: number }>; // Changed from 'count' to 'attempts'
-  topUsersFailedLogins: Array<{ userId: string; failedAttempts: number }>; // Changed from 'user' and 'attempts'
-  peakAuthTimes: number[][]; // Adjusted to match API: array of arrays of numbers
+  loginAttemptsByCountry: Array<{ country: string; attempts: number }>;
+  topUsersFailedLogins: Array<{ userId: string; failedAttempts: number }>;
+  peakAuthTimes: number[][];
+  loginAttemptsGeo: GeoDataItem[];
+  peakAuthTimesHeatmap: HeatmapDataItem[];
 }
 
 const AuthenticationDashboard: React.FC = () => {
@@ -61,20 +78,67 @@ const AuthenticationDashboard: React.FC = () => {
         <p className="text-sm text-gray-400">Data to be integrated</p>
       </div>
 
-      <div className="lg:col-span-3 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl"> {/* Geo-Map Placeholder taking full width of its own row */}
-        <h3 className="text-lg font-semibold text-gray-100 mb-2">Login Attempts by Country (Placeholder)</h3>
-        <div className="overflow-auto max-h-40 text-sm text-gray-300">
-          {data.loginAttemptsByCountry.length > 0 ? (
-            data.loginAttemptsByCountry.map(c => (
-              <span key={c.country} className="mr-4">{c.country}: {c.attempts.toLocaleString()}</span>
-            ))
-          ) : (
-            <p>No country data available.</p>
-          )}
-        </div>
+      {/* Geo Map - taking full width of its own row */}
+      <div className="lg:col-span-3 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl h-96 md:h-[500px]">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Login Attempts Geo Distribution</h3>
+        {data.loginAttemptsGeo && data.loginAttemptsGeo.length > 0 ? (
+          <ReactECharts
+            option={{
+              tooltip: {
+                trigger: 'item',
+                formatter: (params: any) => {
+                  if (params.data && typeof params.data.originalSuccessful === 'number' && typeof params.data.originalFailed === 'number') {
+                    return `${params.name}<br/>Successful: ${params.data.originalSuccessful.toLocaleString()}<br/>Failed: ${params.data.originalFailed.toLocaleString()}<br/>Total: ${params.value.toLocaleString()}`;
+                  }
+                  return `${params.name}: ${params.value != null ? params.value.toLocaleString() : 'N/A'} (Total Attempts)`;
+                }
+              },
+              visualMap: {
+                min: 0,
+                max: data.loginAttemptsGeo.length > 0 ? data.loginAttemptsGeo.reduce((max, item) => Math.max(max, item.value[0] + item.value[1]), 0) : 0,
+                left: 'left',
+                top: 'bottom',
+                text: ['High', 'Low'],
+                calculable: true,
+                inRange: {
+                  color: ['#50A3BA', '#E08A7F', '#D94E5D'] // Example: light blue to red
+                },
+                textStyle: { color: '#fff' }
+              },
+              series: [
+                {
+                  name: 'Login Attempts',
+                  type: 'map',
+                  map: 'world',
+                  roam: true,
+                  emphasis: {
+                    label: { show: true, color: '#fff' },
+                    itemStyle: { areaColor: '#A9D0F5' }
+                  },
+                  itemStyle: {
+                    areaColor: '#323c48',
+                    borderColor: '#111'
+                  },
+                  data: data.loginAttemptsGeo.map(item => ({
+                    name: item.name,
+                    value: item.value[0] + item.value[1],
+                    originalSuccessful: item.value[0],
+                    originalFailed: item.value[1]
+                  })),
+                }
+              ],
+              backgroundColor: 'transparent',
+            }}
+            style={{ height: '100%', width: '100%' }}
+            notMerge={true}
+            lazyUpdate={true}
+          />
+        ) : (
+          <p className="text-gray-400 text-center pt-10">No geo-map data available.</p>
+        )}
       </div>
 
-      {/* Middle Row: Charts */}
+      {/* Middle Row: Charts (Line and Bar) */}
       <div className="lg:col-span-2 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl h-96">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">Authentication Attempts Over Time</h3>
         <ResponsiveContainer width="100%" height="85%">
@@ -115,26 +179,90 @@ const AuthenticationDashboard: React.FC = () => {
       </div>
 
       {/* Heatmap Placeholder - Spanning full width */}
-      <div className="lg:col-span-3 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl">
-        <h3 className="text-lg font-semibold text-gray-100 mb-2">Peak Authentication Times (Raw Data Placeholder)</h3>
-        <div className="overflow-x-auto text-xs text-gray-400 max-h-48">
-          <p className="mb-1 text-sm text-gray-300">Activity heatmap (Hour of Day vs. Day of Week)</p>
-          {data.peakAuthTimes.length > 0 ? (
-            data.peakAuthTimes.map((row, rowIndex) => (
-              <div key={rowIndex} className="flex">
-                <span className="w-12 font-semibold">{rowIndex.toString().padStart(2, '0')}:00 </span>
-                {row.map((val, colIndex) => (
-                  <span key={colIndex} className="w-8 text-center" title={`Day ${colIndex + 1}, Hour ${rowIndex}: ${val} attempts`}>{val}</span>
-                ))}
+      {/* Heatmap - Spanning full width */}
+      <div className="lg:col-span-3 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl h-96 md:h-[500px]">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Peak Authentication Times (Hour of Day vs. Day of Week)</h3>
+        {data.peakAuthTimesHeatmap && data.peakAuthTimesHeatmap.length > 0 ? (
+          <ResponsiveHeatMap
+            data={data.peakAuthTimesHeatmap}
+            indexBy="id" // Days of the week ('Mon', 'Tue', etc.)
+            keys={data.peakAuthTimesHeatmap[0] && data.peakAuthTimesHeatmap[0].data ? data.peakAuthTimesHeatmap[0].data.map(d => d.x) : []} // Hours of the day ("00:00", "01:00", ...)
+            margin={{ top: 70, right: 90, bottom: 60, left: 90 }} // Adjusted top margin
+            axisTop={{
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: -55, // Steeper rotation for hour labels
+              legend: 'Hour of Day',
+              legendPosition: 'middle',
+              legendOffset: -60, // Adjusted offset
+            }}
+            axisLeft={{
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: 0,
+              legend: 'Day of Week',
+              legendPosition: 'middle',
+              legendOffset: -75,
+            }}
+            colors={{
+              type: 'sequential',
+              scheme: 'inferno', // Using a more vibrant scheme
+            }}
+            cellOpacity={0.9}
+            cellBorderWidth={1}
+            cellBorderColor={{ from: 'color', modifiers: [['darker', 0.5]] }}
+            labelTextColor={{ from: 'color', modifiers: [['brighter', 3]] }} // Brighter label for dark cells
+            enableGridX={false} // Optional: remove vertical grid lines
+            enableGridY={true}  // Optional: keep horizontal grid lines
+            hoverTarget="cell"
+            legends={[
+              {
+                anchor: 'bottom',
+                translateX: 0,
+                translateY: 45, // Adjusted Y position
+                length: 300,
+                thickness: 12,
+                direction: 'row',
+                tickPosition: 'after',
+                tickSize: 3,
+                tickSpacing: 4,
+                tickOverlap: false,
+                tickFormat: '~r', // More robust integer formatting
+                title: 'Auth Attempts',
+                titleAlign: 'middle',
+                titleOffset: -10, // Position title above legend ticks
+              },
+            ]}
+            tooltip={({ cell }) => (
+              <div className="p-2 bg-gray-900 text-white rounded shadow-lg border border-gray-700">
+                <strong>{cell.serieId}</strong> at <strong>{cell.label || cell.xKey}</strong> {/* cell.label or cell.xKey for hour */}
+                <br />
+                Attempts: {typeof cell.value === 'number' ? cell.value.toLocaleString() : 'N/A'}
               </div>
-            ))
-          ) : (
-            <p>No peak time data available.</p>
-          )}
-        </div>
+            )}
+            theme={{
+              axis: {
+                ticks: { text: { fill: '#e5e7eb' } },
+                legend: { text: { fill: '#e5e7eb' } },
+              },
+              legends: {
+                title: { text: { fill: '#e5e7eb' } },
+                ticks: { text: { fill: '#e5e7eb' } },
+              },
+              tooltip: {
+                container: {
+                  background: '#333',
+                  color: '#fff',
+                },
+              },
+            }}
+          />
+        ) : (
+          <p className="text-gray-400 text-center pt-10">No peak time heatmap data available.</p>
+        )}
       </div>
 
-      {/* Bottom Row: Table & Placeholders */}
+      {/* Bottom Row: Table & Placeholders (remains the same) */}
       <div className="lg:col-span-3 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">Top 10 Users with Failed Logins</h3>
         <div className="overflow-x-auto">

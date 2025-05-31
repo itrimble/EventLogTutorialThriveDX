@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 
-interface CloudAppRisk {
-  app: string;
-  dataSharingRisk: string;
-  complianceRisk: string;
-  accessControlRisk: string;
-  overallRiskScore: number;
+// Interface for the new cloudAppRisks data structure
+interface CloudAppRiskDataItem {
+  x: number; // risk score
+  y: number; // usage score
+  sensitivity: number;
+  users: number;
+  appName: string;
+}
+
+interface CloudAppRiskGroup {
+  id: string; // AppName, will also be used for series id
+  data: CloudAppRiskDataItem[];
 }
 
 interface FileSharingExposureItem {
@@ -31,7 +38,7 @@ type CASBPolicyEnforcementDataItem = CASBPolicy | { fileSharingExposure: FileSha
 
 
 interface CASBData {
-  cloudAppRiskMatrix: CloudAppRisk[];
+  cloudAppRisks: CloudAppRiskGroup[]; // Updated field name and type
   casbPolicyEnforcement: CASBPolicyEnforcementDataItem[];
 }
 
@@ -80,59 +87,84 @@ const CASBDashboard: React.FC = () => {
   if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
   if (!data) return <div className="text-center p-8 text-gray-100">No data available.</div>;
 
-  const getRiskScoreClass = (score: number) => {
-    if (score >= 7) return 'text-red-400 font-bold';
-    if (score >= 4) return 'text-yellow-400 font-semibold';
-    return 'text-green-400';
-  };
-
-  const getRiskLevelClass = (level: string) => {
-    switch (level.toLowerCase()) {
-      case 'critical': return 'text-red-500 font-bold';
-      case 'high': return 'text-red-400 font-semibold';
-      case 'medium': return 'text-yellow-400';
-      case 'low': return 'text-green-400';
-      default: return 'text-gray-300';
-    }
-  };
-
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6">
-      {/* Cloud App Risk Matrix */}
-      <div className="lg:col-span-2 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl">
-        <h3 className="text-lg font-semibold text-gray-100 mb-4">Cloud App Risk Matrix</h3>
-        <div className="overflow-x-auto">
-          {data.cloudAppRiskMatrix && data.cloudAppRiskMatrix.length > 0 ? (
-            <table className="w-full text-sm text-left text-gray-400">
-              <thead className="text-xs text-gray-100 uppercase bg-gray-700">
-                <tr>
-                  <th scope="col" className="py-3 px-6">Application</th>
-                  <th scope="col" className="py-3 px-6">Data Sharing Risk</th>
-                  <th scope="col" className="py-3 px-6">Compliance Risk</th>
-                  <th scope="col" className="py-3 px-6">Access Control Risk</th>
-                  <th scope="col" className="py-3 px-6 text-center">Overall Risk Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.cloudAppRiskMatrix.map((app) => (
-                  <tr key={app.app} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-600">
-                    <td className="py-4 px-6 font-medium text-gray-200 whitespace-nowrap">{app.app}</td>
-                    <td className={`py-4 px-6 ${getRiskLevelClass(app.dataSharingRisk)}`}>{app.dataSharingRisk}</td>
-                    <td className={`py-4 px-6 ${getRiskLevelClass(app.complianceRisk)}`}>{app.complianceRisk}</td>
-                    <td className={`py-4 px-6 ${getRiskLevelClass(app.accessControlRisk)}`}>{app.accessControlRisk}</td>
-                    <td className={`py-4 px-6 text-center ${getRiskScoreClass(app.overallRiskScore)}`}>{app.overallRiskScore}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-gray-400">No cloud app risk data available.</p>
-          )}
-        </div>
+      {/* Cloud App Risk Bubble Chart */}
+      <div className="lg:col-span-2 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl h-96 md:h-[500px]">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Cloud Application Risk Landscape</h3>
+        {data.cloudAppRisks && data.cloudAppRisks.length > 0 ? (
+          <ResponsiveScatterPlot
+            data={data.cloudAppRisks}
+            margin={{ top: 60, right: 140, bottom: 70, left: 90 }}
+            xScale={{ type: 'linear', min: 0, max: 100 }} // Risk Score 0-100
+            xFormat={v => `${v} Risk`}
+            yScale={{ type: 'linear', min: 0, max: 100 }} // Usage Score 0-100
+            yFormat={v => `${v} Usage`}
+            blendMode="multiply"
+            nodeSize={node => node.data.sensitivity / 2 + 10} // Bubble size based on sensitivity
+            colors={{ scheme: 'spectral' }}
+            axisTop={null}
+            axisRight={null}
+            axisBottom={{
+              orient: 'bottom',
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: 0,
+              legend: 'Overall Risk Score',
+              legendPosition: 'middle',
+              legendOffset: 46,
+              format: v => `${v}`, // Simple number format
+              tickValues: [0, 20, 40, 60, 80, 100],
+            }}
+            axisLeft={{
+              orient: 'left',
+              tickSize: 5,
+              tickPadding: 5,
+              tickRotation: 0,
+              legend: 'Usage Score / Adoption',
+              legendPosition: 'middle',
+              legendOffset: -60,
+              format: v => `${v}`, // Simple number format
+              tickValues: [0, 20, 40, 60, 80, 100],
+            }}
+            legends={[
+              {
+                anchor: 'bottom-right',
+                direction: 'column',
+                justify: false,
+                translateX: 130,
+                translateY: 0,
+                itemsSpacing: 5,
+                itemWidth: 100,
+                itemHeight: 12,
+                itemDirection: 'left-to-right',
+                itemOpacity: 0.85,
+                symbolSize: 12,
+                symbolShape: 'circle',
+                effects: [{ on: 'hover', style: { itemOpacity: 1 } }],
+              }
+            ]}
+            tooltip={({ node }) => (
+              <div className="p-2 bg-gray-900 text-white rounded shadow-lg border border-gray-700 text-sm">
+                <strong>{node.data.appName}</strong><br />
+                Risk: {node.data.x}<br />
+                Usage: {node.data.y}<br />
+                Sensitivity: {node.data.sensitivity}<br />
+                Users: {node.data.users.toLocaleString()}
+              </div>
+            )}
+            theme={{
+              axis: { ticks: { text: { fill: '#e5e7eb' } }, legend: { text: { fill: '#e5e7eb' } } },
+              legends: { text: { text: { fill: '#e5e7eb' } } },
+              tooltip: { container: { background: '#1f2937', color: '#e5e7eb', border: '1px solid #374151' } }
+            }}
+          />
+        ) : (
+          <p className="text-gray-400 text-center pt-10">No cloud app risk data available.</p>
+        )}
       </div>
 
-      {/* CASB Policy Enforcement */}
+      {/* CASB Policy Enforcement (remains the same) */}
       <div className="lg:col-span-1 bg-gray-800 p-4 md:p-6 rounded-lg shadow-xl">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">CASB Policy Enforcement Actions</h3>
         <div className="overflow-y-auto max-h-96 space-y-3">
