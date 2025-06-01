@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from '@/components/layout/Header'; // Adjusted path
 import Sidebar from '@/components/layout/Sidebar'; // Adjusted path
 import Breadcrumbs from '@/components/layout/Breadcrumbs'; // Import Breadcrumbs
+import { Toaster } from '@/components/ui/sonner'; // Import Sonner Toaster
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,6 +48,8 @@ export default function RootLayout({
             </main>
           </div>
         </div>
+        {/* Sonner Toaster for notifications */}
+        <Toaster />
       </body>
     </html>
   );
