@@ -175,6 +175,103 @@ function normalizeSyslog(rawEvent: any): NormalizedEvent | null {
   return null;
 }
 
+// --- Normalization Function for macOS Logs ---
+function normalizeMacOSLog(rawEvent: any, sourceType: string): NormalizedEvent | null {
+  // Handle both string (file logs) and JSON (unified log) formats
+  let message: string;
+  let timestamp: string;
+  let parsed_fields: Record<string, any> = {};
+
+  if (typeof rawEvent === 'string') {
+    // File-based log entry (like system.log, install.log)
+    message = rawEvent;
+    timestamp = new Date().toISOString(); // Use current time for now, could parse from log line
+    
+    // Extract basic fields from log line if possible
+    const logLineRegex = /^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+([\w.-]+)\s+(.*)/;
+    const match = rawEvent.match(logLineRegex);
+    
+    if (match) {
+      const timeStr = match[1];
+      const hostname = match[2];
+      const logMessage = match[3];
+      
+      // Parse timestamp (simplified - assumes current year)
+      const currentYear = new Date().getFullYear();
+      const dateWithYear = `${currentYear} ${timeStr}`;
+      const parsedDate = new Date(dateWithYear);
+      if (!isNaN(parsedDate.getTime())) {
+        timestamp = parsedDate.toISOString();
+      }
+      
+      parsed_fields.hostname = hostname;
+      message = logMessage;
+    }
+  } else if (typeof rawEvent === 'object' && rawEvent.raw_message) {
+    // Object with raw_message (from file collection)
+    message = rawEvent.raw_message;
+    timestamp = rawEvent.timestamp_collected || new Date().toISOString();
+    parsed_fields.source_file = rawEvent.source_file;
+  } else if (typeof rawEvent === 'object') {
+    // JSON formatted log (from unified log)
+    message = rawEvent.eventMessage || rawEvent.message || JSON.stringify(rawEvent);
+    timestamp = rawEvent.timestamp || rawEvent.machTimestamp || new Date().toISOString();
+    
+    // Copy all fields as parsed data
+    Object.assign(parsed_fields, rawEvent);
+  } else {
+    console.warn(`[LogNormalizer] Unsupported macOS log format for ${sourceType}:`, typeof rawEvent);
+    return null;
+  }
+
+  // Determine event type and severity based on source and content
+  let event_type_id = 'macos_log';
+  let severity = 'Information';
+  let tags = ['macos'];
+
+  // Source-specific processing
+  if (sourceType.includes('auth')) {
+    tags.push('authentication');
+    event_type_id = 'macos_auth';
+    if (message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')) {
+      severity = 'Medium';
+    }
+  } else if (sourceType.includes('security')) {
+    tags.push('security');
+    event_type_id = 'macos_security';
+    severity = 'High';
+  } else if (sourceType.includes('install')) {
+    tags.push('software', 'installation');
+    event_type_id = 'macos_install';
+  } else if (sourceType.includes('system')) {
+    tags.push('system');
+    event_type_id = 'macos_system';
+  } else if (sourceType.includes('process')) {
+    tags.push('process');
+    event_type_id = 'macos_process';
+  } else if (sourceType.includes('network')) {
+    tags.push('network');
+    event_type_id = 'macos_network';
+  } else if (sourceType.includes('firewall')) {
+    tags.push('firewall', 'network');
+    event_type_id = 'macos_firewall';
+    severity = 'Medium';
+  }
+
+  return {
+    timestamp,
+    event_source_name: sourceType,
+    event_type_id,
+    hostname: parsed_fields.hostname || parsed_fields.machineID || undefined,
+    severity,
+    message_short: message.substring(0, 255),
+    message_full: message,
+    tags,
+    parsed_fields,
+    raw_log: typeof rawEvent === 'string' ? rawEvent : JSON.stringify(rawEvent),
+  };
+}
+
 // --- Main Exported Normalization Function ---
 export async function normalizeEvent(
   rawEvent: any,
@@ -187,6 +284,25 @@ export async function normalizeEvent(
       return normalizeWindowsEventJson(rawEvent);
     case 'syslog_rfc5424': // Or just 'syslog'
       return normalizeSyslog(rawEvent);
+    // macOS log sources
+    case 'macos_auth_events':
+    case 'macos_security_events':
+    case 'macos_process_events':
+    case 'macos_network_events':
+    case 'macos_firewall_events':
+    case 'macos_install_events':
+    case 'macos_system_log':
+    case 'macos_security_log':
+    case 'macos_audit_trail':
+    case 'macos_kernel_events':
+    case 'macos_crash_events':
+    case 'macos_xpc_events':
+    case 'macos_fs_events':
+    case 'macos_bluetooth_events':
+    case 'macos_usb_events':
+    case 'macos_spotlight_events':
+    case 'macos_generic_log':
+      return normalizeMacOSLog(rawEvent, logSourceIdentifier);
     // Add more cases for other log sources here
     // case 'firewall_asa_csv':
     //   return normalizeFirewallAsaCsv(rawEvent);

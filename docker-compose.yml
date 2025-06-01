@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: timescale/timescaledb:pg14-ts2.10-oss # Using a specific version for better reproducibility
+    image: timescale/timescaledb:latest-pg14 # Using latest pg14 version
     container_name: eventlog_db_timescale_local
     ports:
       - "5432:5432" # Expose PostgreSQL port to the host

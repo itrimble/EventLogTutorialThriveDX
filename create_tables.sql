@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 
 -- Create the events table
 CREATE TABLE events (
-    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID DEFAULT gen_random_uuid(),
     timestamp TIMESTAMPTZ NOT NULL,
     ingestion_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     event_source_name VARCHAR(255),
@@ -18,7 +18,8 @@ CREATE TABLE events (
     message_full TEXT, -- Detailed event message, potentially multi-line (nullable)
     tags TEXT[], -- For categorization like 'authentication', 'network', 'malware'
     parsed_fields JSONB, -- For structured fields extracted from logs, e.g., {"src_ip": "192.168.1.100", "dst_port": 80}
-    raw_log TEXT -- The original unprocessed log entry (nullable)
+    raw_log TEXT, -- The original unprocessed log entry (nullable)
+    PRIMARY KEY (event_id, timestamp)
 );
 
 -- Create indexes on key fields

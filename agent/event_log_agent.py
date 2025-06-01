@@ -115,14 +115,14 @@ def collect_file_log_lines(file_path: str, source_section_name: str) -> List[Dic
             lines_read_this_cycle = 0
             max_lines_per_cycle = 1000 # Safety break for very busy files
 
-            for line in f:
+            while lines_read_this_cycle < max_lines_per_cycle:
+                line = f.readline()
+                if not line:  # End of file
+                    break
                 line = line.strip()
                 if line:
                     new_lines_data.append({"raw_message": line, "source_file": file_path, "timestamp_collected": time.strftime('%Y-%m-%dT%H:%M:%S%z')})
-                    lines_read_this_cycle +=1
-                    if lines_read_this_cycle >= max_lines_per_cycle:
-                        logger.warning(f"[{source_section_name}] Read {max_lines_per_cycle} lines from {file_path}, pausing this cycle to avoid overwhelming.")
-                        break
+                    lines_read_this_cycle += 1
 
             current_pos = f.tell()
             file_states[file_path] = current_pos
@@ -324,4 +324,3 @@ if __name__ == "__main__":
         # Ensure final flush if not caught by atexit/signal (e.g. if loop breaks due to error)
         if not shutdown_flag: # if handle_exit wasn't already called by a signal
              handle_exit()
-```
