@@ -282,10 +282,7 @@ const EventsTable: React.FC<EventsTableProps> = ({
             setIsModalOpen(false);
             setSelectedEvent(null);
           }}
-          // Assuming EventDetailsModal is updated or can handle LogEntry
-          // If EventDetailsModal expects the old LogEntry type, it needs an update too.
-          // For now, we pass the new LogEntry type.
-          logEntry={selectedEvent} 
+          dataItem={selectedEvent} 
         />
       )}
     </div>

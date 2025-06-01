@@ -43,26 +43,22 @@ export async function GET(request: Request) {
     
     // Transform the rows to match the LogEntry type expected by the frontend
     const logEntries = result.rows.map(row => ({
-      Id: row.event_id,
-      TimeCreated: row.timestamp,
-      EventID: parseInt(row.event_type_id) || 0,
-      EventRecordID: row.event_id,
-      Level: row.severity || 'Information',
-      Task: 0,
-      Keywords: row.tags ? row.tags.join(', ') : '',
-      Channel: row.event_source_name || 'Unknown',
-      Computer: row.hostname || 'Unknown',
-      Security: { UserID: row.user_id || 'N/A' },
-      EventData: {
-        // Extract relevant fields from parsed_fields JSON
-        ...(row.parsed_fields || {}),
-        IpAddress: row.ip_address,
-        EventTypeId: row.event_type_id,
-        Source: row.event_source_name,
-        ProcessName: row.process_name,
-        ProcessId: row.process_id
-      },
-      Message: row.message_full || row.message_short || row.raw_log || 'No message available'
+      id: row.event_id,
+      timestamp: row.timestamp,
+      source_identifier: row.event_source_name || 'Unknown',
+      log_file: row.parsed_fields?.source_file || 'Unknown',
+      message: row.message_full || row.message_short || row.raw_log || 'No message available',
+      enriched_data: {
+        severity: row.severity,
+        hostname: row.hostname,
+        ip_address: row.ip_address,
+        user_id: row.user_id,
+        process_name: row.process_name,
+        process_id: row.process_id,
+        tags: row.tags,
+        parsed_fields: row.parsed_fields,
+        event_type_id: row.event_type_id
+      }
     }));
 
     return NextResponse.json(logEntries);
