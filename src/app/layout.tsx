@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from '@/components/layout/Header'; // Adjusted path
 import Sidebar from '@/components/layout/Sidebar'; // Adjusted path
+import Breadcrumbs from '@/components/layout/Breadcrumbs'; // Import Breadcrumbs
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,6 +41,7 @@ export default function RootLayout({
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-y-auto">
             <Header />
+            <Breadcrumbs /> {/* Add Breadcrumbs component here */}
             <main className="flex-1 p-6 bg-gray-800"> {/* Main content bg slightly lighter */}
               {children}
             </main>

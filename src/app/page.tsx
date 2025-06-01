@@ -1,235 +1,118 @@
-'use client'
+'use client';
+import { useState, useEffect } from 'react';
+import { useSearchStore } from '@/store/searchStore'; // Import Zustand store
+import GenericResultsTable from '@/components/explorer/GenericResultsTable'; // Import the new table
 
-import { useState } from 'react'
-import { EventMapping } from '@/data/eventMappings'
-import { EventSearch } from '@/components/EventSearch'
-import { SIEMQueryGenerator } from '@/components/SIEMQueryGenerator'
-import { Shield, Database, Search, Code } from 'lucide-react'
+// MockEvent interface and fetchMockEvents are removed
 
 export default function Home() {
-  const [selectedEvents, setSelectedEvents] = useState<EventMapping[]>([])
+  const [resultsData, setResultsData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const handleEventSelect = (event: EventMapping) => {
-    setSelectedEvents(prev => {
-      const isAlreadySelected = prev.some(selected => selected.eventId === event.eventId)
-      
-      if (isAlreadySelected) {
-        return prev.filter(selected => selected.eventId !== event.eventId)
-      } else {
-        return [...prev, event]
+  const submittedQuery = useSearchStore((state) => state.submittedQuery);
+  // const clearSubmittedQuery = useSearchStore((state) => state.clearSubmittedQuery); // Available if needed
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // This function is called only when submittedQuery is a non-empty string
+      setIsLoading(true);
+      setApiError(null);
+      setResultsData([]); // Clear previous results
+
+      try {
+        const response = await fetch('/api/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: submittedQuery }), // submittedQuery is guaranteed non-null, non-empty here
+        });
+
+        const responseBody = await response.json();
+
+        if (response.ok) {
+          setResultsData(responseBody.data || []); // Ensure data is always an array
+        } else {
+          setApiError(responseBody.error || `API Error: ${response.status} ${response.statusText}`);
+          setResultsData([]);
+        }
+      } catch (err: any) {
+        console.error('Fetch API Error:', err);
+        setApiError(`Network or Fetch Error: ${err.message || 'Unknown fetch error'}`);
+        setResultsData([]);
+      } finally {
+        setIsLoading(false);
       }
-    })
-  }
+    };
 
-  const handleClearSelection = () => {
-    setSelectedEvents([])
-  }
+    if (submittedQuery === null) { // Initial state or cleared
+      setResultsData([]);
+      setIsLoading(false);
+      setApiError(null);
+    } else if (submittedQuery.trim() === '') { // Empty query submitted
+      setResultsData([]);
+      setIsLoading(false);
+      setApiError('Search query cannot be empty. Please enter a KQL query.');
+    } else { // Valid query string to attempt fetch
+      fetchData();
+    }
+  }, [submittedQuery]); // Dependency array for useEffect
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <Shield className="text-blue-600" size={32} />
-                <h1 className="text-2xl font-bold text-gray-900">
-                  EventLog Tutorial
-                </h1>
-              </div>
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
-                ThriveDX
-              </span>
-            </div>
-            
-            <nav className="flex items-center space-x-6 text-sm">
-              <a 
-                href="#search" 
-                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                <Search size={16} />
-                <span>Search Events</span>
-              </a>
-              <a 
-                href="#generator" 
-                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                <Code size={16} />
-                <span>Query Generator</span>
-              </a>
-              <a 
-                href="https://attack.mitre.org" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                <Database size={16} />
-                <span>MITRE ATT&amp;CK</span>
-              </a>
-            </nav>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col h-full bg-gray-800 text-gray-100">
+      <div className="p-4 bg-gray-700 text-center text-white border-b border-gray-600">
+        <p className="text-lg font-semibold">Search & Explore</p>
+      </div>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-4">
-            Windows Event Log Analysis &amp; SIEM Query Generation
-          </h2>
-          <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-8">
-            Learn cybersecurity monitoring by exploring Windows Event IDs mapped to MITRE ATT&amp;CK 
-            techniques and generating targeted SIEM queries for Splunk, Sentinel, ELK, and Logstash.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            <div className="text-center">
-              <Search className="mx-auto mb-2" size={32} />
-              <h3 className="font-semibold mb-1">Search Event IDs</h3>
-              <p className="text-sm text-blue-100">Find relevant events by attack type</p>
-            </div>
-            <div className="text-center">
-              <Shield className="mx-auto mb-2" size={32} />
-              <h3 className="font-semibold mb-1">MITRE Mapping</h3>
-              <p className="text-sm text-blue-100">ATT&amp;CK technique correlation</p>
-            </div>
-            <div className="text-center">
-              <Code className="mx-auto mb-2" size={32} />
-              <h3 className="font-semibold mb-1">Query Generation</h3>
-              <p className="text-sm text-blue-100">Multi-platform SIEM queries</p>
-            </div>
-            <div className="text-center">
-              <Database className="mx-auto mb-2" size={32} />
-              <h3 className="font-semibold mb-1">Real-time Learning</h3>
-              <p className="text-sm text-blue-100">Hands-on cybersecurity education</p>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-64 bg-gray-700 p-4 overflow-y-auto border-r border-gray-600">
+          <h3 className="text-md font-semibold mb-3">Filters</h3>
+          <p className="text-sm text-gray-400">(Faceted filtering options will appear here)</p>
+          {/* Example filter sections */}
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-1">Source IP</h4>
+            <p className="text-xs text-gray-500">(List of IPs)</p>
           </div>
-        </div>
-      </section>
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-1">Event ID</h4>
+            <p className="text-xs text-gray-500">(List of Event IDs)</p>
+          </div>
+        </aside>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Event Search Section */}
-          <div id="search" className="lg:col-span-2 space-y-6">
-            <EventSearch 
-              onEventSelect={handleEventSelect}
-              selectedEvents={selectedEvents}
-            />
+        <main className="flex-1 flex flex-col p-4 overflow-y-auto">
+          <div className="h-32 bg-gray-700 rounded-md mb-4 flex items-center justify-center">
+            <p className="text-sm text-gray-400">(Interactive Timeline Visualization)</p>
           </div>
 
-          {/* SIEM Query Generator Section */}
-          <div id="generator" className="lg:col-span-1">
-            <div className="sticky top-8">
-              <SIEMQueryGenerator 
-                selectedEvents={selectedEvents}
-                onClearSelection={handleClearSelection}
-              />
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Educational Resources Section */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Educational Resources
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Enhance your cybersecurity knowledge with these essential resources for Windows event log analysis and threat detection.
-            </p>
+          <div className="mb-4 flex space-x-2 border-b border-gray-600">
+            <button className="px-4 py-2 text-sm font-medium text-blue-400 border-b-2 border-blue-400 focus:outline-none">Events</button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Statistics</button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Patterns</button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Alerts</button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-3">Windows Event Documentation</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Official Microsoft documentation on Windows Event IDs and security audit events.
-              </p>
-              <a
-                href="https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/basic-security-audit-events"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                View Documentation →
-              </a>
-            </div>
+          <div className="flex-grow bg-gray-700 rounded-md p-4">
+            {isLoading && <p className="text-sm text-gray-300">Loading results...</p>}
+            {apiError && !isLoading && <p className="text-sm text-red-400">Error: {apiError}</p>}
 
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-3">MITRE ATT&amp;CK Framework</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Comprehensive knowledge base of adversary tactics, techniques, and procedures.
-              </p>
-              <a
-                href="https://attack.mitre.org/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                Explore Framework →
-              </a>
-            </div>
+            {!isLoading && !apiError && resultsData.length > 0 && (
+              <GenericResultsTable data={resultsData} /> // Use the new table component
+            )}
 
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-3">SIEM Query References</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Platform-specific documentation for Splunk, Sentinel, ELK, and Logstash query languages.
-              </p>
-              <div className="space-y-1">
-                <a
-                  href="https://docs.splunk.com/Documentation/Splunk/latest/SearchTutorial/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  Splunk Search →
-                </a>
-                <a
-                  href="https://learn.microsoft.com/en-us/azure/sentinel/queries"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  Sentinel KQL →
-                </a>
-                <a
-                  href="https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  ELK DSL →
-                </a>
-              </div>
-            </div>
+            {!isLoading && !apiError && resultsData.length === 0 && submittedQuery !== null && submittedQuery.trim() !== '' && (
+              <p className="text-sm text-gray-300">No results found for your query.</p>
+            )}
+
+            {/* Initial prompt message when submittedQuery is null and not loading and no error */}
+            {!isLoading && !apiError && submittedQuery === null && (
+              <p className="text-sm text-gray-300">Enter a query in the search bar above and click Search.</p>
+            )}
+
+            {/* Message for empty query submission is handled by apiError display: "Error: Search query cannot be empty..." */}
           </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Shield size={24} />
-              <span className="font-semibold">EventLog Tutorial ThriveDX</span>
-            </div>
-            <div className="flex items-center space-x-6 text-sm text-gray-400">
-              <span>Built for cybersecurity education</span>
-              <a
-                href="mailto:itrimble@gmail.com"
-                className="hover:text-white transition-colors"
-              >
-                Contact: itrimble@gmail.com
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+        </main>
+      </div>
     </div>
-  )
+  );
 }
