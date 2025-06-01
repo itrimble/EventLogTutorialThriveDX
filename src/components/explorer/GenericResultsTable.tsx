@@ -179,7 +179,6 @@ const GenericResultsTable: React.FC<GenericResultsTableProps> = ({
       </div>
 
       {data.length === 0 && !isLoading && !error && (<p className="text-gray-400 text-center py-4">No data to display.</p>)}
-          </div>
 
       {data.length > 0 && (
         <div className="overflow-x-auto shadow-md rounded-lg">
