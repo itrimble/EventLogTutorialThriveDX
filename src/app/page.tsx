@@ -97,7 +97,12 @@ export default function Home() {
             {apiError && !isLoading && <p className="text-sm text-red-400">Error: {apiError}</p>}
 
             {!isLoading && !apiError && resultsData.length > 0 && (
-              <GenericResultsTable data={resultsData} /> // Use the new table component
+              <GenericResultsTable
+                data={resultsData}
+                isLoading={isLoading} // Pass isLoading
+                error={apiError}     // Pass apiError to error prop
+                title="Query Results"  // Example title
+              />
             )}
 
             {!isLoading && !apiError && resultsData.length === 0 && submittedQuery !== null && submittedQuery.trim() !== '' && (
