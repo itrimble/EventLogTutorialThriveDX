@@ -6,19 +6,20 @@ import { usePathname } from 'next/navigation'; // Import usePathname
 import { 
   ChevronLeftIcon, 
   ChevronRightIcon, 
-  HomeIcon, 
-  MagnifyingGlassIcon, 
-  ChartBarIcon, 
-  BellIcon, 
+  MagnifyingGlassIcon,
+  ChartBarIcon,
+  EyeIcon, // Reusing for Investigations
+  BellIcon,
+  CloudArrowUpIcon, // New icon for Data Ingestion
   CogIcon,
-  CommandLineIcon, // Existing icon
-  EyeIcon, // Existing icon for Visualizations
-  DocumentTextIcon, // New icon for Reporting
-  LockClosedIcon,
-  UserGroupIcon,
-  ShieldCheckIcon,
-  TruckIcon,
-  CloudIcon
+  // HomeIcon, // No longer used for 'Dashboard'
+  // CommandLineIcon, // No longer used for 'SIEM Queries'
+  // DocumentTextIcon, // No longer used for 'Reporting'
+  // LockClosedIcon, // No longer used
+  // UserGroupIcon, // No longer used
+  // ShieldCheckIcon, // No longer used
+  // TruckIcon, // No longer used
+  // CloudIcon // No longer used
 } from '@heroicons/react/24/outline';
 
 const Sidebar: React.FC = () => {
@@ -30,19 +31,11 @@ const Sidebar: React.FC = () => {
   };
 
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: HomeIcon },
-    { href: '/explorer', label: 'Explorer', icon: MagnifyingGlassIcon },
-    { href: '/siem_queries', label: 'SIEM Queries', icon: CommandLineIcon }, 
-    { href: '/visualizations', label: 'Visualizations', icon: EyeIcon }, 
-    // New specialized dashboard links:
-    { href: '/visualizations', label: 'Auth & Access', icon: LockClosedIcon, isSubItem: true },
-    { href: '/visualizations', label: 'Insider Threat', icon: UserGroupIcon, isSubItem: true },
-    { href: '/visualizations', label: 'Malware Defense', icon: ShieldCheckIcon, isSubItem: true },
-    { href: '/visualizations', label: 'Supply Chain Risk', icon: TruckIcon, isSubItem: true },
-    { href: '/visualizations', label: 'CASB', icon: CloudIcon, isSubItem: true },
-    { href: '/reporting', label: 'Reporting', icon: DocumentTextIcon },
-    { href: '/analysis', label: 'Analysis', icon: ChartBarIcon },
-    { href: '/alerts', label: 'Alerts', icon: BellIcon },
+    { href: '/', label: 'Search & Explore', icon: MagnifyingGlassIcon },
+    { href: '/dashboards', label: 'Dashboards', icon: ChartBarIcon },
+    { href: '/investigations', label: 'Investigations', icon: EyeIcon },
+    { href: '/alerts', label: 'Detections', icon: BellIcon },
+    { href: '/ingestion', label: 'Data Ingestion', icon: CloudArrowUpIcon },
     { href: '/settings', label: 'Settings', icon: CogIcon },
   ];
 
@@ -66,35 +59,20 @@ const Sidebar: React.FC = () => {
             // but the sub-item itself should only be "active" if its specific label is the one being "viewed" (though href is the same).
             // However, since all hrefs are currently /visualizations, this specific highlighting for sub-items isn't directly possible yet
             // without changing hrefs or adding more state to manage active sub-tab.
-            // For now, any /visualizations path will make "Visualizations" and all its sub-items appear active.
-
-            // A more specific active check for the parent "Visualizations" link:
-            const isParentActive = item.label === 'Visualizations' && pathname === '/visualizations';
-            // A check to see if current path is /visualizations, for sub-items
-            const isVisualizationPage = pathname === '/visualizations';
-
-            let itemIsActive = isActive;
-            if (item.isSubItem && isVisualizationPage && !isParentActive) {
-              // If we are on /visualizations, and this is a sub-item,
-              // we don't want it to show the main "active" state unless the parent also would.
-              // This logic might need refinement when sub-items have unique HREFs.
-              // For now, they will all highlight if path is /visualizations.
-            }
-
-
+            // isActive will be true if the current pathname matches the item's href.
+            // No special sub-item logic is needed anymore.
             return (
               <li key={item.label} className="mb-1 mx-2">
                 <Link href={item.href} legacyBehavior>
-                  <a 
-                    className={`flex items-center p-3 rounded-md transition-colors duration-150 ease-in-out
+                  <a
+                    className={`group flex items-center p-3 rounded-md transition-colors duration-150 ease-in-out
                                ${isCollapsed ? 'justify-center' : ''}
-                               ${!isCollapsed && item.isSubItem ? 'pl-6' : ''} // Indent sub-items when not collapsed
-                               ${(itemIsActive || (item.label === 'Visualizations' && isVisualizationPage))
-                                 ? 'bg-blue-600 text-white shadow-lg' 
+                               ${isActive
+                                 ? 'bg-blue-600 text-white shadow-lg'
                                  : 'text-gray-300 hover:bg-gray-600 hover:text-white'
                                }`}
                   >
-                    <item.icon className={`h-6 w-6 ${!isCollapsed ? 'mr-3' : ''} ${(itemIsActive || (item.label === 'Visualizations' && isVisualizationPage)) ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`} />
+                    <item.icon className={`h-6 w-6 ${!isCollapsed ? 'mr-3' : ''} ${isActive ? 'text-white' : 'text-gray-300 group-hover:text-white'}`} />
                     {!isCollapsed && <span className="font-medium">{item.label}</span>}
                   </a>
                 </Link>
