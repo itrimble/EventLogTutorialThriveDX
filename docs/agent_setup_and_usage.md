@@ -4,9 +4,10 @@
 
 The Python Log Collection Agent (`event_log_agent.py`) is a script designed to collect event logs from various sources on a machine and forward them to the EventLog Analyzer's central ingestion API (`/api/ingest`). This allows for the aggregation and analysis of logs from multiple endpoints.
 
-Currently, the agent primarily supports:
+Currently, the agent supports:
 *   **Windows Event Logs:** By executing configurable PowerShell commands to fetch events and convert them to JSON.
-*   **Text-based Log Files:** Through basic file tailing (e.g., for application logs, syslogs stored in files).
+*   **macOS Log Files:** Comprehensive support for macOS system logs, including install logs, system logs, auth events, security events, and more.
+*   **Text-based Log Files:** Through file tailing (e.g., for application logs, syslogs stored in files).
 
 The agent batches collected events and sends them periodically to the API, with retry mechanisms for transient network issues.
 
@@ -88,8 +89,8 @@ The agent uses a configuration file named `config.ini` located in the same direc
     **`[DEFAULT]` Section:**
     These settings apply globally unless overridden in specific source sections.
 
-    *   `INGEST_API_URL = http://localhost:3000/api/ingest`
-        *   The full URL of the EventLog Analyzer's ingestion API endpoint.
+    *   `INGEST_API_URL = http://localhost:3002/api/ingest`
+        *   The full URL of the EventLog Analyzer's ingestion API endpoint. Note: Use port 3002 if running the Next.js app on that port to avoid conflicts.
     *   `LOG_SOURCE_IDENTIFIER = generic_text_log`
         *   A default identifier for log sources if not specified in a source-specific section. The API uses this to determine how to normalize the incoming raw events.
     *   `BATCH_SIZE = 10`
@@ -134,6 +135,35 @@ The agent uses a configuration file named `config.ini` located in the same direc
     *   `[FileLog:SyslogLocal]` (for `/var/log/syslog`)
 
     You can add more `[FileLog:...]` sections as needed.
+
+    **macOS-Specific Configuration Examples:**
+    For macOS systems, you can configure specific log sources using the following identifiers that are supported by the log normalizer:
+
+    *   `macos_install_events` - for `/var/log/install.log`
+    *   `macos_system_log` - for `/var/log/system.log`
+    *   `macos_auth_events` - for authentication-related logs
+    *   `macos_security_events` - for security-related logs
+    *   `macos_process_events` - for process-related logs
+    *   `macos_network_events` - for network-related logs
+    *   `macos_firewall_events` - for firewall logs
+    *   `macos_kernel_events` - for kernel logs
+    *   `macos_crash_events` - for crash reports
+    *   `macos_audit_trail` - for audit logs
+
+    Example macOS configuration:
+    ```ini
+    [FileLog:MacInstallLogs]
+    ENABLED = true
+    LOG_SOURCE_IDENTIFIER = macos_install_events
+    FILE_PATH = /var/log/install.log
+    COLLECTION_INTERVAL_SECONDS = 30
+
+    [FileLog:MacSystemLogs]
+    ENABLED = true
+    LOG_SOURCE_IDENTIFIER = macos_system_log
+    FILE_PATH = /var/log/system.log
+    COLLECTION_INTERVAL_SECONDS = 15
+    ```
 
 ## 4. Running the Agent
 
@@ -227,4 +257,27 @@ To use it:
 
 The script will guide you through the setup and provide instructions on how to activate the environment, configure, and run the agent.
 
-**Note for macOS users:** The agent's Windows Event Log collection features will not work on macOS. You should focus on configuring file log sources (`[FileLog:...]` sections) in `agent/config.ini`. The `install_agent_mac.sh` script will remind you of this.
+**Note for macOS users:** The agent's Windows Event Log collection features will not work on macOS. However, comprehensive macOS log support is now available through the file log sources (`[FileLog:...]` sections) with specific macOS log source identifiers. Configure these sections in `agent/config.ini` using the macOS-specific identifiers listed above. The `install_agent_mac.sh` script will remind you of this and provide examples.
+
+## 8. Recent Updates and Fixes
+
+### macOS Log Support (Latest)
+- Added comprehensive macOS log normalization support for 15+ different log source types
+- Enhanced log parsing for both file-based logs and structured JSON logs
+- Automatic extraction of timestamps, hostnames, and event categorization
+- Support for authentication, security, process, network, firewall, and system logs
+
+### Database Compatibility
+- Updated TimescaleDB Docker configuration to use `latest-pg14` image
+- Fixed database schema for TimescaleDB hypertable compatibility with composite primary keys
+- Improved database connection handling and error reporting
+
+### Agent Reliability Improvements
+- Fixed file position tracking error that caused "telling position disabled by next() call"
+- Improved file reading logic using readline() instead of iterator pattern
+- Enhanced error handling and logging for better troubleshooting
+- Better batch processing and retry mechanisms for API connectivity
+
+### Port Configuration
+- Updated default API URL to use port 3002 to avoid conflicts with other services
+- Added configuration notes about port selection and conflict resolution
