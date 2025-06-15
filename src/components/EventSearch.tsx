@@ -5,6 +5,8 @@ import { Search, AlertTriangle, Shield, Database } from 'lucide-react'
 import { searchEventsByAttackType, searchEventsByMitreTechnique, EventMapping } from '@/data/eventMappings'
 import { EventCard } from './EventCard'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button' // Import ShadCN Button
+import { Input } from '@/components/ui/input'   // Import ShadCN Input
 
 interface EventSearchProps {
   onEventSelect?: (event: EventMapping) => void
@@ -61,56 +63,46 @@ export function EventSearch({ onEventSelect, selectedEvents = [] }: EventSearchP
       <div className="space-y-4">
         {/* Search Type Selector */}
         <div className="flex justify-center space-x-4">
-          <button
+          <Button
+            variant={searchType === 'attack' ? 'default' : 'outline'}
             onClick={() => setSearchType('attack')}
-            className={cn(
-              "flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors",
-              searchType === 'attack'
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-            )}
+            className="flex items-center space-x-2"
           >
             <AlertTriangle size={16} />
             <span>Attack Type</span>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={searchType === 'technique' ? 'default' : 'outline'}
             onClick={() => setSearchType('technique')}
-            className={cn(
-              "flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors",
-              searchType === 'technique'
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-            )}
+            className="flex items-center space-x-2"
           >
             <Shield size={16} />
             <span>MITRE Technique</span>
-          </button>
+          </Button>
         </div>
 
         {/* Search Input */}
-        <div className="max-w-2xl mx-auto relative">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={
-                searchType === 'attack' 
-                  ? "e.g., privilege escalation, lateral movement, credential access..." 
-                  : "e.g., T1078, T1021, T1003..."
-              }
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-          </div>
-          <button
+        <div className="max-w-2xl mx-auto relative flex items-center">
+          <Search className="absolute left-3 text-gray-400" size={20} />
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder={
+              searchType === 'attack'
+                ? "e.g., privilege escalation, lateral movement, credential access..."
+                : "e.g., T1078, T1021, T1003..."
+            }
+            className="w-full pl-10 pr-[calc(theme(spacing.4)_+_theme(spacing.10))]" // Adjusted pr for button
+          />
+          <Button
             onClick={handleSearch}
             disabled={!searchTerm.trim() || isSearching}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-1.5 rounded text-sm transition-colors"
+            className="absolute right-2" // Removed top-1/2 and transform
           >
             {isSearching ? 'Searching...' : 'Search'}
-          </button>
+          </Button>
         </div>
 
         {/* Search Examples */}
@@ -119,51 +111,65 @@ export function EventSearch({ onEventSelect, selectedEvents = [] }: EventSearchP
           <div className="flex flex-wrap justify-center gap-2">
             {searchType === 'attack' ? (
               <>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('privilege escalation')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   privilege escalation
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('lateral movement')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   lateral movement
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('credential access')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   credential access
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('defense evasion')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   defense evasion
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('T1078')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   T1078 (Valid Accounts)
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('T1021')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   T1021 (Remote Services)
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setSearchTerm('T1003')}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                  className="text-xs"
                 >
                   T1003 (Credential Dumping)
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -205,9 +211,9 @@ export function EventSearch({ onEventSelect, selectedEvents = [] }: EventSearchP
           <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
           <p className="text-gray-500">
             Try searching with different keywords or browse the{' '}
-            <button className="text-blue-500 hover:text-blue-600 underline">
+            <Button variant="link" className="p-0 h-auto text-blue-500 hover:text-blue-600">
               complete event catalog
-            </button>
+            </Button>
           </p>
         </div>
       )}

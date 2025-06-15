@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button'; // Import ShadCN Button
 import { useSearchStore } from '@/store/searchStore'; // Import Zustand store
 import GenericResultsTable from '@/components/explorer/GenericResultsTable'; // Import the new table
 
@@ -86,10 +87,10 @@ export default function Home() {
           </div>
 
           <div className="mb-4 flex space-x-2 border-b border-gray-600">
-            <button className="px-4 py-2 text-sm font-medium text-blue-400 border-b-2 border-blue-400 focus:outline-none">Events</button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Statistics</button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Patterns</button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Alerts</button>
+            <Button variant="link" className="px-4 py-2 text-sm font-medium text-blue-400 border-b-2 border-blue-400 focus:outline-none rounded-none">Events</Button>
+            <Button variant="ghost" className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Statistics</Button>
+            <Button variant="ghost" className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Patterns</Button>
+            <Button variant="ghost" className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 focus:outline-none">Alerts</Button>
           </div>
 
           <div className="flex-grow bg-gray-700 rounded-md p-4">

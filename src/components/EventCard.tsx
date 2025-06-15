@@ -3,6 +3,8 @@
 import { EventMapping } from '@/data/eventMappings'
 import { cn, formatEventId } from '@/lib/utils'
 import { Shield, AlertTriangle, Database, CheckCircle } from 'lucide-react'
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 interface EventCardProps {
   event: EventMapping
@@ -11,65 +13,58 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, isSelected = false, onClick }: EventCardProps) {
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
+  const getSeverityBadgeVariant = (severity: string): { variant: "default" | "secondary" | "destructive" | "outline", className?: string } => {
+    switch (severity.toLowerCase()) {
       case 'critical':
-        return 'text-red-600 bg-red-50 border-red-200'
       case 'high':
-        return 'text-red-500 bg-red-50 border-red-200'
+        return { variant: 'destructive' }
       case 'medium':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+        return { variant: 'outline', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' }
       case 'low':
-        return 'text-green-600 bg-green-50 border-green-200'
+        return { variant: 'outline', className: 'bg-green-100 text-green-700 border-green-300' }
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200'
+        return { variant: 'secondary' }
     }
   }
 
+  const severityBadgeStyle = getSeverityBadgeVariant(event.severity);
+
   return (
-    <div
+    <Card
       onClick={onClick}
       className={cn(
-        "relative p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md",
+        "relative cursor-pointer transition-all duration-200 hover:shadow-md",
         isSelected
-          ? "bg-blue-50 border-blue-300 shadow-sm"
+          ? "bg-blue-50 border-blue-300 shadow-sm ring-2 ring-blue-300" // Added ring for better visibility
           : "bg-white border-gray-200 hover:border-gray-300"
       )}
     >
       {/* Selection Indicator */}
       {isSelected && (
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 z-10"> {/* Ensure z-index for visibility */}
           <CheckCircle className="text-blue-500" size={20} />
         </div>
       )}
 
-      {/* Event ID and Name */}
-      <div className="space-y-2">
+      <CardHeader className="pb-2"> {/* Reduced padding bottom */}
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="font-mono text-lg font-bold text-gray-900">
-              {formatEventId(event.eventId)}
-            </span>
-            <div className={cn(
-              "px-2 py-1 text-xs font-medium rounded border",
-              getSeverityColor(event.severity)
-            )}>
-              {event.severity.toUpperCase()}
-            </div>
-          </div>
+          <CardTitle className="font-mono text-lg font-bold text-gray-900">
+            {formatEventId(event.eventId)}
+          </CardTitle>
+          <Badge variant={severityBadgeStyle.variant} className={cn("text-xs font-medium", severityBadgeStyle.className)}>
+            {event.severity.toUpperCase()}
+          </Badge>
         </div>
-        
-        <h3 className="font-medium text-gray-900 leading-tight">
+        <CardDescription className="font-medium text-gray-900 leading-tight pt-1"> {/* Added padding top */}
           {event.eventName}
-        </h3>
-        
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-3 pt-2 pb-4"> {/* Adjusted padding */}
         <p className="text-sm text-gray-600 line-clamp-2">
           {event.description}
         </p>
-      </div>
 
-      {/* Metadata */}
-      <div className="mt-4 space-y-3">
         {/* Log Source */}
         <div className="flex items-center space-x-2">
           <Database size={14} className="text-gray-400" />
@@ -77,54 +72,61 @@ export function EventCard({ event, isSelected = false, onClick }: EventCardProps
         </div>
 
         {/* Attack Types */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle size={14} className="text-orange-500" />
-            <span className="text-xs font-medium text-gray-700">Attack Types</span>
+        {event.attackTypes && event.attackTypes.length > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle size={14} className="text-orange-500" />
+              <span className="text-xs font-medium text-gray-700">Attack Types</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {event.attackTypes.slice(0, 3).map((type, index) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="text-xs bg-orange-100 text-orange-700 border-orange-200"
+                >
+                  {type}
+                </Badge>
+              ))}
+              {event.attackTypes.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{event.attackTypes.length - 3} more
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {event.attackTypes.slice(0, 3).map((type, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded"
-              >
-                {type}
-              </span>
-            ))}
-            {event.attackTypes.length > 3 && (
-              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                +{event.attackTypes.length - 3} more
-              </span>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* MITRE Techniques */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <Shield size={14} className="text-blue-500" />
-            <span className="text-xs font-medium text-gray-700">MITRE Techniques</span>
+        {event.mitreTechniques && event.mitreTechniques.length > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <Shield size={14} className="text-blue-500" />
+              <span className="text-xs font-medium text-gray-700">MITRE Techniques</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {event.mitreTechniques.slice(0, 2).map((technique, index) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="text-xs bg-blue-100 text-blue-700 border-blue-200 font-mono"
+                >
+                  {technique}
+                </Badge>
+              ))}
+              {event.mitreTechniques.length > 2 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{event.mitreTechniques.length - 2} more
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {event.mitreTechniques.slice(0, 2).map((technique, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded font-mono"
-              >
-                {technique}
-              </span>
-            ))}
-            {event.mitreTechniques.length > 2 && (
-              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                +{event.mitreTechniques.length - 2} more
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+        )}
+      </CardContent>
 
-      {/* Hover State Indicator */}
-      <div className="absolute inset-0 border-2 border-transparent rounded-lg transition-colors hover:border-blue-200 pointer-events-none" />
-    </div>
+      {/* Hover State Indicator (implicit via Card's hover state and border changes) */}
+      {/* The original explicit hover div might not be needed if Card's hover styles are sufficient */}
+      {/* If specific hover border is still needed, it can be handled by Card's className logic */}
+    </Card>
   )
 }

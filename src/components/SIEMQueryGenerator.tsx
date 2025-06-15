@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import { EventMapping } from '@/data/eventMappings'
 import { generateSIEMQuery, formatEventId } from '@/lib/utils'
-import { Copy, Download, Settings, Code, Database, Trash2 } from 'lucide-react'
+import { Copy, Download, Settings, Code, Database, Trash2, Info } from 'lucide-react' // Added Info
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge' // Added Badge
 
 interface SIEMQueryGeneratorProps {
   selectedEvents: EventMapping[]
@@ -83,20 +87,23 @@ export function SIEMQueryGenerator({ selectedEvents, onClearSelection }: SIEMQue
           <h3 className="text-lg font-semibold text-blue-900">
             SIEM Query Generator ({selectedEvents.length} events)
           </h3>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClearSelection}
-            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
+            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800"
           >
             <Trash2 size={16} />
             <span>Clear All</span>
-          </button>
+          </Button>
         </div>
         
         <div className="flex flex-wrap gap-2">
           {selectedEvents.map((event) => (
-            <div
+            <Badge
               key={event.eventId}
-              className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full border"
+              variant="secondary"
+              className="flex items-center space-x-2 px-3 py-1 rounded-full border"
             >
               <span className="font-mono text-sm font-medium">
                 {formatEventId(event.eventId)}
@@ -104,7 +111,7 @@ export function SIEMQueryGenerator({ selectedEvents, onClearSelection }: SIEMQue
               <span className="text-sm text-gray-600 truncate max-w-32">
                 {event.eventName}
               </span>
-            </div>
+            </Badge>
           ))}
         </div>
       </div>
@@ -112,66 +119,63 @@ export function SIEMQueryGenerator({ selectedEvents, onClearSelection }: SIEMQue
       {/* Platform Selection */}
       <div className="space-y-3">
         <h4 className="font-medium text-gray-900">Select SIEM Platform</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {SIEM_PLATFORMS.map((platform) => (
-            <button
-              key={platform.id}
-              onClick={() => setSelectedPlatform(platform.id)}
-              className={`p-3 text-left border rounded-lg transition-colors ${
-                selectedPlatform === platform.id
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <div className="font-medium">{platform.name}</div>
-              <div className={`text-sm ${
-                selectedPlatform === platform.id ? 'text-blue-100' : 'text-gray-500'
-              }`}>
-                {platform.description}
-              </div>
-            </button>
-          ))}
-        </div>
+        <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+          <SelectTrigger className="w-full md:w-1/2">
+            <SelectValue placeholder="Select a platform" />
+          </SelectTrigger>
+          <SelectContent>
+            {SIEM_PLATFORMS.map((platform) => (
+              <SelectItem key={platform.id} value={platform.id}>
+                <div className="font-medium">{platform.name}</div>
+                <div className="text-sm text-gray-500">{platform.description}</div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Advanced Filters */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-gray-900">Query Filters</h4>
-          <button
+          <Button
+            variant="link"
+            size="sm"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
+            className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
           >
             <Settings size={16} />
             <span>{showAdvanced ? 'Hide' : 'Show'} Advanced</span>
-          </button>
+          </Button>
         </div>
 
         {showAdvanced && (
           <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">Additional Filters</span>
-              <button
+              <Button
+                size="sm"
                 onClick={addFilter}
-                className="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
               >
                 Add Filter
-              </button>
+              </Button>
             </div>
             
             {Object.entries(additionalFilters).length > 0 && (
               <div className="space-y-2">
                 {Object.entries(additionalFilters).map(([key, value]) => (
                   <div key={key} className="flex items-center space-x-2 text-sm">
-                    <span className="font-mono bg-white px-2 py-1 rounded border">
+                    <Badge variant="outline" className="font-mono">
                       {key} = &quot;{value}&quot;
-                    </span>
-                    <button
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => removeFilter(key)}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 h-6 w-6" // Adjusted size
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -188,20 +192,21 @@ export function SIEMQueryGenerator({ selectedEvents, onClearSelection }: SIEMQue
             <span>Generated Query</span>
           </h4>
           <div className="flex space-x-2">
-            <button
+            <Button
+              variant="outline"
               onClick={handleCopyQuery}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded border transition-colors"
+              className="flex items-center space-x-2"
             >
               <Copy size={14} />
               <span>Copy</span>
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleDownloadQuery}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded transition-colors"
+              className="flex items-center space-x-2"
             >
               <Download size={14} />
               <span>Download</span>
-            </button>
+            </Button>
           </div>
         </div>
         
@@ -213,15 +218,16 @@ export function SIEMQueryGenerator({ selectedEvents, onClearSelection }: SIEMQue
       </div>
 
       {/* Query Tips */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h5 className="font-medium text-yellow-800 mb-2">Query Tips</h5>
-        <div className="text-sm text-yellow-700 space-y-1">
+      <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
+        <Info className="h-4 w-4 text-yellow-700" />
+        <AlertTitle className="font-medium text-yellow-800">Query Tips</AlertTitle>
+        <AlertDescription className="text-sm text-yellow-700 space-y-1">
           <p>• Test queries in a non-production environment first</p>
           <p>• Adjust time ranges based on your investigation scope</p>
           <p>• Consider adding host filters to narrow down results</p>
           <p>• Monitor query performance for large time ranges</p>
-        </div>
-      </div>
+        </AlertDescription>
+      </Alert>
     </div>
   )
 }
